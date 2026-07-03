@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>Dashboard Penjualan &amp; Laba Toko</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap');
+
+  :root{
+    --paper:#FAF6EF; --paper-deep:#F1EADC; --ink:#2B2118; --ink-soft:#6B5D4F;
+    --line:#DCD0BC; --sage:#6E7D53; --sage-bg:#EAEEDF; --clay:#BE5A3A; --clay-bg:#F7E4DA;
+    --gold:#C4922A; --gold-bg:#F6EAD0; --white:#FFFFFF;
+    --shadow: 0 1px 2px rgba(43,33,24,0.06), 0 8px 24px -12px rgba(43,33,24,0.18);
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; background:var(--paper); color:var(--ink); font-family:'Inter',sans-serif; padding:32px 20px 80px;}
+  .wrap{max-width:1180px; margin:0 auto;}
+
+  /* ---- Login gate ---- */
+  #loginScreen{
+    min-height:80vh; display:flex; align-items:center; justify-content:center; flex-direction:column;
+  }
+  .login-card{
+    background:var(--white); border:1px solid var(--line); border-radius:14px; box-shadow:var(--shadow);
+    padding:36px 34px; width:100%; max-width:380px; text-align:left;
+  }
+  .login-card .eyebrow{font-family:'IBM Plex Mono',monospace; font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:var(--clay); font-weight:600; margin-bottom:8px;}
+  .login-card h1{font-family:'Fraunces',serif; font-size:26px; margin:0 0 6px;}
+  .login-card p{color:var(--ink-soft); font-size:13.5px; margin:0 0 22px;}
+  .field{margin-bottom:14px;}
+  .field label{display:block; font-size:12.5px; font-weight:600; color:var(--ink-soft); margin-bottom:5px;}
+  .field input{width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:8px; font-family:'Inter',sans-serif; font-size:14px; background:var(--paper);}
+  .field input:focus{outline:2px solid var(--clay); outline-offset:1px;}
+  .login-btn{width:100%; margin-top:6px; padding:11px; background:var(--clay); color:#fff; border:none; border-radius:8px; font-weight:700; font-size:14px; cursor:pointer;}
+  .login-btn:disabled{opacity:.6; cursor:default;}
+  .login-err{color:var(--clay); font-size:12.5px; margin-top:10px; min-height:16px;}
+  #dashboardScreen{display:none;}
+
+  header.top{display:flex; justify-content:space-between; align-items:flex-end; gap:20px;
+    border-bottom:2px dashed var(--line); padding-bottom:22px; margin-bottom:20px; flex-wrap:wrap;}
+  .eyebrow{font-family:'IBM Plex Mono',monospace; font-size:12px; letter-spacing:.14em; text-transform:uppercase;
+    color:var(--clay); font-weight:600; margin-bottom:6px;}
+  h1{font-family:'Fraunces',serif; font-weight:600; font-size:34px; margin:0 0 6px; letter-spacing:-.01em;}
+  .sub{color:var(--ink-soft); font-size:14.5px; max-width:560px;}
+  .period{font-family:'IBM Plex Mono',monospace; text-align:right; font-size:13px; color:var(--ink-soft); line-height:1.7;}
+  .period b{color:var(--ink); font-size:15px;}
+  .logout-link{font-size:12.5px; color:var(--ink-soft); text-decoration:underline; cursor:pointer; background:none; border:none; font-family:'Inter',sans-serif; padding:0; margin-top:6px;}
+
+  .upload-bar{display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+    background:var(--white); border:1.5px dashed var(--clay); border-radius:12px;
+    padding:14px 18px; margin-bottom:14px; box-shadow:var(--shadow);}
+  .upload-bar.alt{border-color:var(--sage);}
+  .upload-bar .ico{font-size:22px;}
+  .upload-txt{flex:1; min-width:220px;}
+  .upload-txt b{font-size:14px;}
+  .upload-txt div.small{font-size:12.5px; color:var(--ink-soft); margin-top:2px;}
+  .btn{font-family:'Inter',sans-serif; font-weight:700; font-size:13.5px; border:none; border-radius:8px;
+    padding:10px 16px; cursor:pointer; transition:transform .1s ease;}
+  .btn:active{transform:scale(.97);}
+  .btn:disabled{opacity:.55; cursor:default;}
+  .btn-primary{background:var(--clay); color:#fff;}
+  .btn-primary.alt{background:var(--sage);}
+  .btn-ghost{background:transparent; color:var(--ink-soft); border:1px solid var(--line);}
+  .upload-status{font-family:'IBM Plex Mono',monospace; font-size:12px; width:100%; margin-top:2px;}
+  .upload-status.ok{color:var(--sage);} .upload-status.err{color:var(--clay);}
+  .upload-row{display:flex; gap:14px; flex-wrap:wrap; margin-bottom:14px;}
+  .upload-row .upload-bar{flex:1; min-width:320px; margin-bottom:0;}
+  .reset-row{display:flex; justify-content:space-between; align-items:center; margin-bottom:28px; flex-wrap:wrap; gap:10px;}
+  #syncStatus{font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--ink-soft);}
+
+  .kpi-row{display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:16px;}
+  .kpi{background:var(--white); border:1px solid var(--line); border-radius:10px; padding:16px 18px; box-shadow:var(--shadow); position:relative;}
+  .kpi::before{content:""; position:absolute; top:0; left:16px; right:16px; height:1px;
+    background:repeating-linear-gradient(90deg,var(--line) 0 6px, transparent 6px 12px);}
+  .kpi .lbl{font-size:11.5px; text-transform:uppercase; letter-spacing:.08em; color:var(--ink-soft); font-weight:600;}
+  .kpi .val{font-family:'IBM Plex Mono',monospace; font-size:24px; font-weight:600; margin-top:6px; color:var(--ink);}
+  .kpi .foot{font-size:12.5px; margin-top:5px; color:var(--ink-soft);}
+  .tag{display:inline-block; padding:2px 7px; border-radius:20px; font-size:11.5px; font-weight:700; font-family:'IBM Plex Mono',monospace;}
+  .tag.up{background:var(--sage-bg); color:var(--sage);}
+  .tag.down{background:var(--clay-bg); color:var(--clay);}
+  .kpi-row.laba{margin-bottom:32px;}
+  .kpi-row.laba .kpi{border-color:#DED2B8; background:linear-gradient(180deg,#FFFDF9,#FFFFFF);}
+
+  section{margin-bottom:34px;}
+  .sec-head{display:flex; justify-content:space-between; align-items:baseline; margin-bottom:14px; flex-wrap:wrap; gap:8px;}
+  h2{font-family:'Fraunces',serif; font-size:20px; font-weight:600; margin:0;}
+  .hint{font-size:12.5px; color:var(--ink-soft);}
+
+  .grid-2{display:grid; grid-template-columns:1.4fr 1fr; gap:16px;}
+  .card{background:var(--white); border:1px solid var(--line); border-radius:12px; padding:20px; box-shadow:var(--shadow);}
+  .card h3{font-size:13.5px; text-transform:uppercase; letter-spacing:.06em; color:var(--ink-soft); margin:0 0 14px; font-weight:700;}
+  canvas{max-width:100%;}
+  .grid-3{display:grid; grid-template-columns:repeat(3,1fr); gap:16px;}
+
+  .notes{display:grid; grid-template-columns:1fr 1fr; gap:16px;}
+  .note{border-radius:12px; padding:18px 20px; border:1px solid var(--line);}
+  .note.pos{background:var(--sage-bg); border-color:#d3ddc0;}
+  .note.neg{background:var(--clay-bg); border-color:#ecd0c2;}
+  .note h4{margin:0 0 10px; font-family:'Fraunces',serif; font-size:16px; display:flex; align-items:center; gap:8px;}
+  .note.pos h4{color:#4B5738;} .note.neg h4{color:#8C3D26;}
+  .note ul{margin:0; padding-left:18px; font-size:13.8px; line-height:1.6;}
+  .note li{margin-bottom:8px;} .note li:last-child{margin-bottom:0;}
+  .note b{color:var(--ink);}
+
+  .loss-list{list-style:none; margin:0; padding:0; font-size:13.5px;}
+  .loss-list li{display:flex; justify-content:space-between; gap:10px; padding:8px 0; border-bottom:1px dashed var(--line);}
+  .loss-list li:last-child{border-bottom:none;}
+  .loss-list .nm{color:var(--ink); font-weight:600;}
+  .loss-list .rp{font-family:'IBM Plex Mono',monospace; color:var(--clay); font-weight:600; white-space:nowrap;}
+  .loss-list .qt{font-size:11.5px; color:var(--ink-soft); display:block;}
+
+  .action-box{background:var(--gold-bg); border:1px solid #ecdba8; border-radius:12px; padding:20px 22px;}
+  .action-box h4{font-family:'Fraunces',serif; font-size:16px; margin:0 0 12px; color:#7A5A15;}
+  .action-box ol{margin:0; padding-left:20px; font-size:13.8px; line-height:1.75;}
+  .action-box li b{color:var(--ink);}
+
+  footer{margin-top:40px; padding-top:16px; border-top:1px dashed var(--line);
+    font-family:'IBM Plex Mono',monospace; font-size:11.5px; color:var(--ink-soft); text-align:center;}
+
+  @media (max-width:860px){
+    .kpi-row{grid-template-columns:repeat(2,1fr);}
+    .grid-2{grid-template-columns:1fr;}
+    .grid-3{grid-template-columns:1fr;}
+    .notes{grid-template-columns:1fr;}
+    .period{text-align:left;}
+  }
+</style>
+</head>
+<body>
+
+<!-- ======================= LOGIN GATE ======================= -->
+<div id="loginScreen" class="wrap">
+  <div class="login-card">
+    <div class="eyebrow">Rekap Kasir · Toko Plastik &amp; Bahan Kue</div>
+    <h1>Masuk Dashboard</h1>
+    <p>Data omzet &amp; laba toko ini hanya bisa diakses setelah login.</p>
+    <div class="field"><label>Email</label><input type="email" id="loginEmail" autocomplete="username"></div>
+    <div class="field"><label>Password</label><input type="password" id="loginPassword" autocomplete="current-password"></div>
+    <button class="login-btn" id="loginBtn">Masuk</button>
+    <div class="login-err" id="loginErr"></div>
+  </div>
+</div>
+
+<!-- ======================= DASHBOARD ======================= -->
+<div id="dashboardScreen">
+<div class="wrap">
+
+  <header class="top">
+    <div>
+      <div class="eyebrow">Rekap Kasir · Toko Plastik &amp; Bahan Kue</div>
+      <h1>Dashboard Penjualan &amp; Laba</h1>
+      <div class="sub">Data tersimpan permanen di Supabase. Upload laporan bulanan / data modal kapan saja untuk memperbarui.</div>
+    </div>
+    <div class="period" id="periodBox">
+      PERIODE<br><b>—</b><br>— hari operasional<br>— jenis produk
+      <div><button class="logout-link" id="logoutBtn">Keluar</button></div>
+    </div>
+  </header>
+
+  <div class="upload-row">
+    <div class="upload-bar">
+      <div class="ico">📤</div>
+      <div class="upload-txt">
+        <b>1. Laporan Penjualan Bulanan (.xlsx)</b>
+        <div class="small">Tiap sheet = 1 bulan. Kolom: Nama Barang, Qty, Harga, SubTotal, Tanggal Transaksi.</div>
+      </div>
+      <button class="btn btn-primary" id="uploadBtn">Pilih File</button>
+      <input type="file" id="fileInput" accept=".xlsx,.xls" hidden>
+      <div class="upload-status" id="uploadStatus"></div>
+    </div>
+    <div class="upload-bar alt">
+      <div class="ico">🧾</div>
+      <div class="upload-txt">
+        <b>2. Data Modal / HPP Produk (.xlsx)</b>
+        <div class="small">Kolom: Nama Barang, Harga Beli, Harga, Nama Kategori.</div>
+      </div>
+      <button class="btn btn-primary alt" id="uploadHppBtn">Pilih File</button>
+      <input type="file" id="hppInput" accept=".xlsx,.xls" hidden>
+      <div class="upload-status" id="hppStatus"></div>
+    </div>
+  </div>
+  <div class="reset-row">
+    <div id="syncStatus">Memuat data dari Supabase…</div>
+    <button class="btn btn-ghost" id="refreshBtn">Muat Ulang Data</button>
+  </div>
+
+  <div class="kpi-row" id="kpiRow"></div>
+  <div class="kpi-row laba" id="kpiRowLaba"></div>
+
+  <section>
+    <div class="sec-head"><h2>Tren Omzet vs Laba Kotor per Bulan</h2><div class="hint" id="trendHint"></div></div>
+    <div class="card"><canvas id="chartTrend" height="90"></canvas></div>
+  </section>
+
+  <section>
+    <div class="notes">
+      <div class="note pos"><h4>📈 Catatan Positif</h4><ul id="notesPos"></ul></div>
+      <div class="note neg"><h4>📉 Catatan Perlu Perhatian</h4><ul id="notesNeg"></ul></div>
+    </div>
+  </section>
+
+  <section class="grid-2">
+    <div class="card"><h3>Profitabilitas per Kategori Produk</h3><canvas id="chartKategori" height="260"></canvas></div>
+    <div class="card">
+      <h3>⚠️ Produk Terjual di Bawah/Nyaris Modal</h3>
+      <ul class="loss-list" id="lossList"></ul>
+    </div>
+  </section>
+
+  <section class="grid-2">
+    <div class="card"><h3>10 Produk Penyumbang Omzet Terbesar</h3><canvas id="chartTopRev" height="230"></canvas></div>
+    <div class="card"><h3>10 Produk Paling Menguntungkan (Laba Rp)</h3><canvas id="chartTopLaba" height="230"></canvas></div>
+  </section>
+
+  <section class="grid-3">
+    <div class="card"><h3>Rata-rata Omzet per Hari (Senin–Minggu)</h3><canvas id="chartWeekday" height="200"></canvas></div>
+    <div class="card" style="grid-column: span 2;"><h3>Omzet Harian</h3><canvas id="chartDaily" height="200"></canvas></div>
+  </section>
+
+  <section>
+    <div class="action-box"><h4>🎯 Rekomendasi Tindakan</h4><ol id="actionList"></ol></div>
+  </section>
+
+  <footer id="footerNote">Dashboard tersambung ke Supabase. Upload laporan terbaru kapan saja untuk memperbarui data.</footer>
+</div>
+</div>
+
+<script>
+/* =====================================================================
+   KONFIGURASI — ISI DENGAN DATA PROJECT SUPABASE ANDA
+   Lihat: Supabase Dashboard > Project Settings > API
+   ===================================================================== */
+const SUPABASE_URL = 'https://YOUR-PROJECT-REF.supabase.co';
+const SUPABASE_ANON_KEY = 'YOUR-ANON-PUBLIC-KEY';
+/* ===================================================================== */
+
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+let RECORDS = [];
+let HPP_RECORDS = [];
+let charts = {};
+
+function rp(n){ return 'Rp' + Math.round(n).toLocaleString('id-ID'); }
+function rpShort(n){
+  if(Math.abs(n)>=1000000) return (n<0?'-':'')+'Rp'+(Math.abs(n)/1000000).toFixed(1).replace('.0','')+'jt';
+  if(Math.abs(n)>=1000) return (n<0?'-':'')+'Rp'+(Math.abs(n)/1000).toFixed(0)+'rb';
+  return 'Rp'+n;
+}
+function pct(v){ return (v>0? '+':'') + v + '%'; }
+function marginColor(m){ return m<10 ? '#BE5A3A' : (m<20 ? '#C4922A' : '#6E7D53'); }
+
+Chart.defaults.font.family = 'Inter';
+Chart.defaults.color = '#6B5D4F';
+
+/* ---------------- CORE COMPUTATION (sama seperti versi lokal) ---------------- */
+function buildHppIndex(hppRecords){
+  const idx = {};
+  hppRecords.forEach(h=>{ idx[h.nama] = h; });
+  return idx;
+}
+
+function computeAll(records, hppRecords){
+  const hppIdx = buildHppIndex(hppRecords);
+  const hppAvailable = hppRecords.length>0;
+
+  const byMonth = {};
+  records.forEach(r=>{ (byMonth[r.bulan] = byMonth[r.bulan]||[]).push(r); });
+
+  let months = Object.keys(byMonth).map(name=>{
+    const rows = byMonth[name];
+    let minDate = rows[0].tgl;
+    rows.forEach(r=>{ if(r.tgl < minDate) minDate = r.tgl; });
+    return {name, rows, minDate};
+  });
+  months.sort((a,b)=> a.minDate < b.minDate ? -1 : (a.minDate > b.minDate ? 1 : 0));
+
+  const monthly = [];
+  let prevRevenue = null;
+  months.forEach(m=>{
+    const revenue = m.rows.reduce((s,r)=>s+r.sub,0);
+    const qty = m.rows.reduce((s,r)=>s+r.qty,0);
+    const hariOperasi = new Set(m.rows.map(r=>r.tgl)).size;
+    const revenuePerHari = hariOperasi? Math.round(revenue/hariOperasi):0;
+    const avgHargaItem = qty? Math.round(revenue/qty):0;
+    const momPct = prevRevenue==null ? null : Math.round(((revenue-prevRevenue)/prevRevenue)*1000)/10;
+
+    let omzetMatched=0, modalMatched=0;
+    m.rows.forEach(r=>{
+      const h = hppIdx[r.nama];
+      if(h){ omzetMatched += r.sub; modalMatched += r.qty*h.modal; }
+    });
+    const labaMatched = omzetMatched - modalMatched;
+    const marginPct = omzetMatched? Math.round(labaMatched/omzetMatched*1000)/10 : null;
+    const coveragePct = revenue? Math.round(omzetMatched/revenue*1000)/10 : 0;
+
+    monthly.push({bulan:m.name, revenue, qty, hariOperasi, revenuePerHari, avgHargaItem, momPct,
+      omzetMatched, modalMatched, labaMatched, marginPct, coveragePct});
+    prevRevenue = revenue;
+  });
+
+  const dailyMap = {};
+  records.forEach(r=>{ dailyMap[r.tgl] = (dailyMap[r.tgl]||0)+r.sub; });
+  const daily = Object.keys(dailyMap).sort().map(d=>({Tanggal:d, SubTotal:dailyMap[d]}));
+
+  const revByProd={}, qtyByProd={};
+  records.forEach(r=>{
+    revByProd[r.nama]=(revByProd[r.nama]||0)+r.sub;
+    qtyByProd[r.nama]=(qtyByProd[r.nama]||0)+r.qty;
+  });
+  const topRevenue = Object.entries(revByProd).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([nama,value])=>({nama,value}));
+  const topQty = Object.entries(qtyByProd).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([nama,value])=>({nama,value}));
+
+  const wdNames=['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
+  const wdOrder=['Senin','Selasa','Rabu','Kamis','Jumat','Sabtu','Minggu'];
+  const wdSums={}, wdCounts={};
+  Object.keys(dailyMap).forEach(d=>{
+    const wd = wdNames[new Date(d+'T00:00:00').getDay()];
+    wdSums[wd]=(wdSums[wd]||0)+dailyMap[d];
+    wdCounts[wd]=(wdCounts[wd]||0)+1;
+  });
+  const weekday = wdOrder.map(w=>({hari:w, avg: wdCounts[w]? Math.round(wdSums[w]/wdCounts[w]):0}));
+
+  let qtyCheap=0, qtyTotal=0, subCheap=0, subTotal=0;
+  records.forEach(r=>{
+    qtyTotal+=r.qty; subTotal+=r.sub;
+    if(r.harga<=5000){ qtyCheap+=r.qty; subCheap+=r.sub; }
+  });
+
+  const totalRevenue = monthly.reduce((s,m)=>s+m.revenue,0);
+  const totalQty = monthly.reduce((s,m)=>s+m.qty,0);
+  const totalHariOperasi = monthly.reduce((s,m)=>s+m.hariOperasi,0);
+  const totalProdukUnik = new Set(records.map(r=>r.nama)).size;
+  const allDates = Object.keys(dailyMap).sort();
+
+  const prodAgg = {}, catAgg = {};
+  records.forEach(r=>{
+    const h = hppIdx[r.nama];
+    if(!h) return;
+    const modal = r.qty*h.modal, laba = r.sub-modal;
+    if(!prodAgg[r.nama]) prodAgg[r.nama]={nama:r.nama, omzet:0, laba:0, qty:0};
+    prodAgg[r.nama].omzet+=r.sub; prodAgg[r.nama].laba+=laba; prodAgg[r.nama].qty+=r.qty;
+    const kat = h.kategori || 'Lainnya';
+    if(!catAgg[kat]) catAgg[kat]={kategori:kat, omzet:0, laba:0};
+    catAgg[kat].omzet+=r.sub; catAgg[kat].laba+=laba;
+  });
+  const prodList = Object.values(prodAgg).map(p=>({...p, marginPct: p.omzet? Math.round(p.laba/p.omzet*1000)/10 : null}));
+  const topLaba = [...prodList].sort((a,b)=>b.laba-a.laba).slice(0,10);
+  const lossProducts = prodList.filter(p=>p.laba<0).sort((a,b)=>a.laba-b.laba);
+  const totalLossAmount = lossProducts.reduce((s,p)=>s+p.laba,0);
+  const catList = Object.values(catAgg).map(c=>({...c, marginPct: c.omzet? Math.round(c.laba/c.omzet*1000)/10 : null}))
+    .sort((a,b)=>b.omzet-a.omzet).slice(0,12);
+
+  const totalOmzetMatched = monthly.reduce((s,m)=>s+m.omzetMatched,0);
+  const totalModalMatched = monthly.reduce((s,m)=>s+m.modalMatched,0);
+  const totalLabaMatched = totalOmzetMatched-totalModalMatched;
+  const marginPctOverall = totalOmzetMatched? Math.round(totalLabaMatched/totalOmzetMatched*1000)/10 : null;
+  const coveragePctOverall = totalRevenue? Math.round(totalOmzetMatched/totalRevenue*1000)/10 : 0;
+
+  return {monthly, daily, topRevenue, topQty, weekday, totalRevenue, totalQty, totalHariOperasi,
+    totalProdukUnik, cheap:{qtyCheap,qtyTotal,subCheap,subTotal},
+    periodStart: allDates[0], periodEnd: allDates[allDates.length-1],
+    hppAvailable, totalOmzetMatched, totalModalMatched, totalLabaMatched, marginPctOverall, coveragePctOverall,
+    topLaba, lossProducts, totalLossAmount, catList};
+}
+
+/* ---------------- INSIGHTS ---------------- */
+function generateNotes(D){
+  const pos=[], neg=[];
+  const monthly = D.monthly;
+  if(monthly.length>=2){
+    let bestGrowth=null, worstGrowth=null;
+    monthly.forEach(m=>{
+      if(m.momPct==null) return;
+      if(!bestGrowth || m.momPct>bestGrowth.momPct) bestGrowth=m;
+      if(!worstGrowth || m.momPct<worstGrowth.momPct) worstGrowth=m;
+    });
+    if(bestGrowth && bestGrowth.momPct>0) pos.push(`Pertumbuhan omzet tertinggi terjadi di <b>${bestGrowth.bulan}</b>, naik <b>${pct(bestGrowth.momPct)}</b> dibanding bulan sebelumnya.`);
+    if(worstGrowth && worstGrowth.momPct<0) neg.push(`Penurunan omzet terbesar terjadi di <b>${worstGrowth.bulan}</b>, turun <b>${pct(worstGrowth.momPct)}</b> dibanding bulan sebelumnya.`);
+    const last = monthly[monthly.length-1];
+    if(last.momPct!=null){
+      if(last.momPct>0) pos.push(`Bulan terakhir (<b>${last.bulan}</b>) tumbuh <b>${pct(last.momPct)}</b> — tren omzet sedang positif.`);
+      else if(last.momPct<0) neg.push(`Bulan terakhir (<b>${last.bulan}</b>) turun <b>${pct(last.momPct)}</b> — perlu ditelusuri penyebabnya.`);
+    }
+    let streak=0, maxStreak=0, streakEnd=null;
+    monthly.forEach(m=>{
+      if(m.momPct!=null && m.momPct<0){ streak++; if(streak>maxStreak){maxStreak=streak; streakEnd=m;} }
+      else streak=0;
+    });
+    if(maxStreak>=2) neg.push(`Omzet turun <b>${maxStreak} bulan berturut-turut</b> hingga <b>${streakEnd.bulan}</b> — pola pelemahan yang perlu segera dicari penyebabnya.`);
+  }
+  const best = monthly.reduce((a,b)=> b.revenue>a.revenue?b:a, monthly[0]);
+  const worst = monthly.reduce((a,b)=> b.revenue<a.revenue?b:a, monthly[0]);
+  pos.push(`Omzet tertinggi tercatat di <b>${best.bulan}</b> sebesar <b>${rp(best.revenue)}</b>.`);
+  neg.push(`Omzet terendah tercatat di <b>${worst.bulan}</b> sebesar <b>${rp(worst.revenue)}</b>.`);
+  if(D.topRevenue.length>=2){
+    pos.push(`Dua produk penyumbang omzet terbesar: <b>${D.topRevenue[0].nama}</b> (${rp(D.topRevenue[0].value)}) dan <b>${D.topRevenue[1].nama}</b> (${rp(D.topRevenue[1].value)}).`);
+  }
+  const wdSorted=[...D.weekday].filter(w=>w.avg>0).sort((a,b)=>a.avg-b.avg);
+  if(wdSorted.length>=2){
+    neg.push(`Hari <b>${wdSorted[0].hari}</b> rata-rata menjadi hari dengan omzet terendah (${rp(wdSorted[0].avg)}/hari).`);
+    pos.push(`Hari <b>${wdSorted[wdSorted.length-1].hari}</b> rata-rata menjadi hari dengan omzet tertinggi (${rp(wdSorted[wdSorted.length-1].avg)}/hari).`);
+  }
+  if(D.hppAvailable){
+    pos.push(`Margin laba kotor keseluruhan tercatat <b>${D.marginPctOverall}%</b> (cakupan ${D.coveragePctOverall}% dari total omzet punya data modal).`);
+    const monthlyWithMargin = D.monthly.filter(m=>m.marginPct!=null);
+    if(monthlyWithMargin.length>=2){
+      const first=monthlyWithMargin[0], last=monthlyWithMargin[monthlyWithMargin.length-1];
+      if(last.marginPct > first.marginPct+3){
+        pos.push(`Margin membaik dari <b>${first.marginPct}%</b> (${first.bulan}) menjadi <b>${last.marginPct}%</b> (${last.bulan}).`);
+      } else if(last.marginPct < first.marginPct-3){
+        neg.push(`Margin menurun dari <b>${first.marginPct}%</b> (${first.bulan}) menjadi <b>${last.marginPct}%</b> (${last.bulan}) — perlu dicek penyebabnya.`);
+      }
+    }
+    if(D.catList.length){
+      const bestCat = [...D.catList].sort((a,b)=>b.marginPct-a.marginPct)[0];
+      const worstCatCandidates = D.catList.filter(c=>c.omzet>1000000).sort((a,b)=>a.marginPct-b.marginPct);
+      pos.push(`Kategori <b>${bestCat.kategori}</b> punya margin terbaik (<b>${bestCat.marginPct}%</b>).`);
+      if(worstCatCandidates.length){
+        const wc = worstCatCandidates[0];
+        neg.push(`Kategori <b>${wc.kategori}</b> menyumbang omzet besar (${rp(wc.omzet)}) tapi marginnya tipis, hanya <b>${wc.marginPct}%</b>.`);
+      }
+    }
+    if(D.lossProducts.length){
+      neg.push(`Ditemukan <b>${D.lossProducts.length} produk</b> yang harga jualnya lebih rendah dari harga modal, total kerugian sekitar <b>${rp(Math.abs(D.totalLossAmount))}</b>.`);
+    }
+  } else {
+    neg.push(`Belum ada data harga modal (HPP) — upload data modal produk agar dashboard bisa menghitung laba bersih & margin.`);
+  }
+  const c=D.cheap;
+  if(c.qtyTotal>0 && c.subTotal>0){
+    const qtyCheapPct = Math.round(c.qtyCheap/c.qtyTotal*100);
+    const subCheapPct = Math.round(c.subCheap/c.subTotal*100);
+    if(qtyCheapPct - subCheapPct > 15){
+      neg.push(`Sekitar <b>${qtyCheapPct}%</b> item terjual berasal dari produk ≤Rp5.000, namun hanya <b>${subCheapPct}%</b> dari total omzet.`);
+    }
+  }
+  return {pos, neg};
+}
+
+function generateActions(D){
+  const monthly = D.monthly;
+  const best = monthly.reduce((a,b)=> b.revenue>a.revenue?b:a, monthly[0]);
+  const worst = monthly.reduce((a,b)=> b.revenue<a.revenue?b:a, monthly[0]);
+  const wdSorted=[...D.weekday].filter(w=>w.avg>0).sort((a,b)=>a.avg-b.avg);
+  const lowDay = wdSorted[0]?.hari;
+  const top3 = D.topRevenue.slice(0,3).map(p=>p.nama).join(', ');
+  const actions = [
+    `<b>Manfaatkan pola musiman.</b> <b>${best.bulan}</b> tercatat sebagai bulan dengan omzet tertinggi. Siapkan stok lebih awal untuk periode serupa berikutnya.`,
+    `<b>Antisipasi masa sepi.</b> <b>${worst.bulan}</b> tercatat sebagai bulan terlemah. Gunakan periode ini untuk promo produk non-musiman.`,
+    lowDay ? `<b>Dorong penjualan di hari ${lowDay}.</b> Ini hari dengan omzet rata-rata terendah dalam seminggu.` : null,
+  ];
+  if(D.hppAvailable){
+    if(D.lossProducts.length){
+      const names = D.lossProducts.slice(0,3).map(p=>p.nama).join(', ');
+      actions.push(`<b>Segera tinjau ulang harga jual produk rugi.</b> Produk seperti ${names} dijual di bawah harga modal.`);
+    }
+    const worstCatCandidates = D.catList.filter(c=>c.omzet>1000000).sort((a,b)=>a.marginPct-b.marginPct);
+    if(worstCatCandidates.length){
+      actions.push(`<b>Evaluasi margin kategori ${worstCatCandidates[0].kategori}.</b> Omzetnya besar tapi marginnya tipis (${worstCatCandidates[0].marginPct}%).`);
+    }
+    if(D.topLaba.length){
+      actions.push(`<b>Dorong produk paling menguntungkan.</b> ${D.topLaba[0].nama} menyumbang laba terbesar (${rp(D.topLaba[0].laba)}).`);
+    }
+  } else {
+    actions.push(`<b>Hitung margin, bukan hanya omzet.</b> Upload data HPP agar dashboard bisa menghitung laba bersih & margin per produk.`);
+  }
+  actions.push(top3 ? `<b>Fokus pada produk kunci.</b> Produk seperti ${top3} menyumbang porsi besar omzet — pastikan stoknya tidak pernah kosong.` : null);
+  return actions.filter(Boolean);
+}
+
+/* ---------------- RENDER ---------------- */
+function destroyCharts(){ Object.values(charts).forEach(c=>c && c.destroy()); charts={}; }
+
+function renderAll(D){
+  destroyCharts();
+  if(D.monthly.length===0){
+    document.getElementById('periodBox').innerHTML = `PERIODE<br><b>Belum ada data</b><br>Silakan upload laporan penjualan`;
+    ['kpiRow','kpiRowLaba','notesPos','notesNeg','actionList','lossList'].forEach(id=>document.getElementById(id).innerHTML='');
+    return;
+  }
+
+  document.getElementById('periodBox').innerHTML =
+    `PERIODE<br><b>${D.periodStart} — ${D.periodEnd}</b><br>${D.totalHariOperasi} hari operasional<br>${D.totalProdukUnik} jenis produk terjual
+     <div><button class="logout-link" id="logoutBtn2">Keluar</button></div>`;
+  document.getElementById('logoutBtn2')?.addEventListener('click', logout);
+
+  const avgRevBulan = D.totalRevenue / D.monthly.length;
+  const best = D.monthly.reduce((a,b)=> b.revenue>a.revenue?b:a, D.monthly[0]);
+  const worst = D.monthly.reduce((a,b)=> b.revenue<a.revenue?b:a, D.monthly[0]);
+
+  const kpis = [
+    {lbl:`Total Omzet ${D.monthly.length} Bulan`, val: rpShort(D.totalRevenue), foot: rp(D.totalRevenue)},
+    {lbl:'Rata-rata Omzet / Bulan', val: rpShort(avgRevBulan), foot: Math.round(D.totalQty/D.monthly.length)+' item terjual/bulan'},
+    {lbl:'Bulan Terbaik (Omzet)', val: best.bulan, foot: rp(best.revenue), tag:'up'},
+    {lbl:'Bulan Terlemah (Omzet)', val: worst.bulan, foot: rp(worst.revenue), tag:'down'},
+  ];
+  document.getElementById('kpiRow').innerHTML = kpis.map(k=>`
+    <div class="kpi"><div class="lbl">${k.lbl}</div><div class="val">${k.val}</div>
+    <div class="foot">${k.foot}${k.tag?` <span class="tag ${k.tag}">${k.tag==='up'?'▲ tertinggi':'▼ terendah'}</span>`:''}</div></div>`).join('');
+
+  const kpiLabaEl = document.getElementById('kpiRowLaba');
+  if(D.hppAvailable){
+    const kpisLaba = [
+      {lbl:'Total Laba Kotor', val: rpShort(D.totalLabaMatched), foot: rp(D.totalLabaMatched)+` (margin ${D.marginPctOverall}%)`},
+      {lbl:'Total Modal (HPP)', val: rpShort(D.totalModalMatched), foot: rp(D.totalModalMatched)},
+      {lbl:'Cakupan Data HPP', val: D.coveragePctOverall+'%', foot: 'dari total omzet sudah punya data modal'},
+      {lbl:'Produk Terjual Rugi', val: D.lossProducts.length+' produk', foot: D.lossProducts.length? rp(Math.abs(D.totalLossAmount))+' kerugian' : 'tidak ada', tag: D.lossProducts.length? 'down':'up'},
+    ];
+    kpiLabaEl.style.display='';
+    kpiLabaEl.innerHTML = kpisLaba.map(k=>`
+      <div class="kpi"><div class="lbl">${k.lbl}</div><div class="val">${k.val}</div>
+      <div class="foot">${k.foot}${k.tag?` <span class="tag ${k.tag}">${k.tag==='up'?'▲ aman':'▼ perlu cek'}</span>`:''}</div></div>`).join('');
+  } else {
+    kpiLabaEl.style.display='none';
+  }
+
+  document.getElementById('trendHint').textContent = D.hppAvailable ? 'Laba dihitung dari produk yang sudah punya data modal (HPP)' : 'Upload data HPP untuk melihat garis Laba';
+
+  const trendDatasets = [
+    { label:'Omzet', data:D.monthly.map(m=>m.revenue), borderColor:'#BE5A3A', backgroundColor:'rgba(190,90,58,0.10)',
+      fill:true, tension:0.35, borderWidth:3, pointBackgroundColor:'#BE5A3A', pointRadius:5, pointHoverRadius:7 }
+  ];
+  if(D.hppAvailable){
+    trendDatasets.push({ label:'Laba Kotor', data:D.monthly.map(m=>m.labaMatched), borderColor:'#6E7D53', backgroundColor:'rgba(110,125,83,0.12)',
+      fill:true, tension:0.35, borderWidth:3, pointBackgroundColor:'#6E7D53', pointRadius:5, pointHoverRadius:7 });
+  }
+  charts.trend = new Chart(document.getElementById('chartTrend'), {
+    type:'line', data:{ labels: D.monthly.map(m=>m.bulan), datasets: trendDatasets },
+    options:{ plugins:{legend:{display:D.hppAvailable}, tooltip:{callbacks:{label:c=>{
+        const m = D.monthly[c.dataIndex];
+        if(c.dataset.label==='Laba Kotor') return `Laba: ${rp(c.raw)} (margin ${m.marginPct}%)`;
+        return 'Omzet: '+rp(c.raw);
+      }}}}, scales:{ y:{ticks:{callback:v=>rpShort(v)}, grid:{color:'#EFE7D8'}}, x:{grid:{display:false}} } }
+  });
+
+  const notes = generateNotes(D);
+  document.getElementById('notesPos').innerHTML = notes.pos.map(n=>`<li>${n}</li>`).join('');
+  document.getElementById('notesNeg').innerHTML = notes.neg.map(n=>`<li>${n}</li>`).join('');
+
+  if(D.hppAvailable && D.catList.length){
+    charts.kategori = new Chart(document.getElementById('chartKategori'), {
+      type:'bar', data:{ labels:D.catList.map(c=>c.kategori), datasets:[{ data:D.catList.map(c=>c.omzet),
+        backgroundColor:D.catList.map(c=>marginColor(c.marginPct)), borderRadius:4 }] },
+      options:{ indexAxis:'y', plugins:{legend:{display:false}, tooltip:{callbacks:{label:c=>{
+          const cat = D.catList[c.dataIndex]; return [`Omzet: ${rp(cat.omzet)}`, `Laba: ${rp(cat.laba)}`, `Margin: ${cat.marginPct}%`];
+        }}}}, scales:{ x:{ticks:{callback:v=>rpShort(v)}, grid:{color:'#F1EADC'}}, y:{grid:{display:false}} } }
+    });
+  }
+
+  const lossListEl = document.getElementById('lossList');
+  if(D.hppAvailable && D.lossProducts.length){
+    lossListEl.innerHTML = D.lossProducts.slice(0,10).map(p=>`
+      <li><span><span class="nm">${p.nama}</span><span class="qt">${p.qty} pcs terjual · margin ${p.marginPct}%</span></span>
+      <span class="rp">${rp(p.laba)}</span></li>`).join('');
+  } else if(D.hppAvailable){
+    lossListEl.innerHTML = `<li style="color:var(--sage); font-weight:600;">Tidak ada produk yang dijual di bawah harga modal. Bagus!</li>`;
+  } else {
+    lossListEl.innerHTML = `<li style="color:var(--ink-soft);">Upload data HPP untuk melihat daftar ini.</li>`;
+  }
+
+  charts.topRev = new Chart(document.getElementById('chartTopRev'), {
+    type:'bar', data:{ labels:D.topRevenue.map(p=>p.nama), datasets:[{ data:D.topRevenue.map(p=>p.value), backgroundColor:'#C4922A', borderRadius:4 }] },
+    options:{ indexAxis:'y', plugins:{legend:{display:false}, tooltip:{callbacks:{label:c=>rp(c.raw)}}},
+      scales:{ x:{ticks:{callback:v=>rpShort(v)}, grid:{color:'#F1EADC'}}, y:{grid:{display:false}} } }
+  });
+
+  if(D.hppAvailable && D.topLaba.length){
+    charts.topLaba = new Chart(document.getElementById('chartTopLaba'), {
+      type:'bar', data:{ labels:D.topLaba.map(p=>p.nama), datasets:[{ data:D.topLaba.map(p=>p.laba), backgroundColor:'#6E7D53', borderRadius:4 }] },
+      options:{ indexAxis:'y', plugins:{legend:{display:false}, tooltip:{callbacks:{label:c=>{
+          const p=D.topLaba[c.dataIndex]; return [`Laba: ${rp(p.laba)}`, `Margin: ${p.marginPct}%`];
+        }}}}, scales:{ x:{ticks:{callback:v=>rpShort(v)}, grid:{color:'#F1EADC'}}, y:{grid:{display:false}} } }
+    });
+  }
+
+  const lowestDay = [...D.weekday].filter(w=>w.avg>0).sort((a,b)=>a.avg-b.avg)[0]?.hari;
+  charts.weekday = new Chart(document.getElementById('chartWeekday'), {
+    type:'bar', data:{ labels:D.weekday.map(w=>w.hari), datasets:[{ data:D.weekday.map(w=>w.avg),
+      backgroundColor:D.weekday.map(w=>w.hari===lowestDay?'#BE5A3A':'#8B9A73'), borderRadius:5 }] },
+    options:{ plugins:{legend:{display:false}, tooltip:{callbacks:{label:c=>rp(c.raw)}}},
+      scales:{ y:{ticks:{callback:v=>rpShort(v)}, grid:{color:'#F1EADC'}}, x:{grid:{display:false}} } }
+  });
+
+  charts.daily = new Chart(document.getElementById('chartDaily'), {
+    type:'line', data:{ labels:D.daily.map(d=>d.Tanggal), datasets:[{ data:D.daily.map(d=>d.SubTotal),
+      borderColor:'#BE5A3A', borderWidth:1.5, pointRadius:0, tension:0.25, backgroundColor:'rgba(190,90,58,0.08)', fill:true }] },
+    options:{ plugins:{legend:{display:false}, tooltip:{callbacks:{label:c=>rp(c.raw)}}},
+      scales:{ x:{ticks:{maxTicksLimit:8}, grid:{display:false}}, y:{ticks:{callback:v=>rpShort(v)}, grid:{color:'#F1EADC'}} } }
+  });
+
+  document.getElementById('actionList').innerHTML = generateActions(D).map(a=>`<li>${a}</li>`).join('');
+}
+
+/* ---------------- PARSE XLSX (sama seperti versi lokal) ---------------- */
+function excelSerialToISO(serial){ return new Date(Math.round((serial-25569)*86400*1000)).toISOString().slice(0,10); }
+function jsDateToISO(d){ return new Date(d.getTime() - d.getTimezoneOffset()*60000).toISOString().slice(0,10); }
+function parseTanggal(val){
+  if(val instanceof Date) return jsDateToISO(val);
+  if(typeof val === 'number') return excelSerialToISO(val);
+  if(typeof val === 'string'){
+    const m = val.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    if(m) return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
+    const d2 = new Date(val); if(!isNaN(d2)) return jsDateToISO(d2);
+  }
+  return null;
+}
+function normKey(s){ return String(s||'').trim().toLowerCase(); }
+function findHeaderRow(rows, requiredKeys){
+  for(let i=0;i<Math.min(rows.length,10);i++){
+    const row = rows[i] || []; const keys = row.map(normKey);
+    if(requiredKeys.every(rk=>keys.includes(rk))) return {idx:i, row};
+  }
+  return null;
+}
+function parseWorkbook(workbook){
+  const records = [], warnings = [];
+  workbook.SheetNames.forEach(sheetName=>{
+    const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], {header:1, raw:true, defval:null});
+    const found = findHeaderRow(rows, ['nama barang']);
+    if(!found){ warnings.push(`Sheet "${sheetName}" dilewati (format kolom tidak dikenali).`); return; }
+    const colMap = {};
+    found.row.forEach((cell,ci)=>{
+      const k = normKey(cell);
+      if(k==='nama barang') colMap.nama=ci; else if(k==='qty') colMap.qty=ci;
+      else if(k==='harga') colMap.harga=ci; else if(k==='subtotal') colMap.sub=ci;
+      else if(k==='tanggal transaksi') colMap.tgl=ci;
+    });
+    if(colMap.nama===undefined || colMap.sub===undefined){ warnings.push(`Sheet "${sheetName}" dilewati (kolom wajib tidak lengkap).`); return; }
+    let count=0;
+    for(let i=found.idx+1;i<rows.length;i++){
+      const row = rows[i]; if(!row) continue;
+      const nama = row[colMap.nama];
+      if(nama===null || nama===undefined || String(nama).trim()==='') continue;
+      const tgl = colMap.tgl!==undefined ? parseTanggal(row[colMap.tgl]) : null;
+      if(!tgl) continue;
+      records.push({bulan:sheetName, nama:String(nama).trim(), qty:Number(row[colMap.qty])||0,
+        harga:Number(row[colMap.harga])||0, sub:Number(row[colMap.sub])||0, tgl});
+      count++;
+    }
+    if(count===0) warnings.push(`Sheet "${sheetName}" tidak memiliki baris data yang valid.`);
+  });
+  return {records, warnings};
+}
+function parseHppWorkbook(workbook){
+  const records = [], warnings = [];
+  workbook.SheetNames.forEach(sheetName=>{
+    const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], {header:1, raw:true, defval:null});
+    const found = findHeaderRow(rows, ['nama barang','harga beli']);
+    if(!found){ warnings.push(`Sheet "${sheetName}" dilewati (kolom "Nama Barang"/"Harga Beli" tidak ditemukan).`); return; }
+    const colMap = {};
+    found.row.forEach((cell,ci)=>{
+      const k = normKey(cell);
+      if(k==='nama barang') colMap.nama=ci; else if(k==='harga beli') colMap.modal=ci;
+      else if(k==='harga') colMap.jual=ci; else if(k==='nama kategori') colMap.kategori=ci;
+    });
+    let count=0;
+    for(let i=found.idx+1;i<rows.length;i++){
+      const row = rows[i]; if(!row) continue;
+      const nama = row[colMap.nama];
+      if(nama===null || nama===undefined || String(nama).trim()==='') continue;
+      const modal = Number(row[colMap.modal]);
+      if(!modal && modal!==0) continue;
+      records.push({nama:String(nama).trim(), modal:Number(modal)||0,
+        jual: colMap.jual!==undefined? Number(row[colMap.jual])||0 : 0,
+        kategori: colMap.kategori!==undefined? String(row[colMap.kategori]||'').trim() : ''});
+      count++;
+    }
+    if(count===0) warnings.push(`Sheet "${sheetName}" tidak memiliki baris data modal yang valid.`);
+  });
+  return {records, warnings};
+}
+
+/* ---------------- SUPABASE: LOAD & SAVE ---------------- */
+async function fetchAllRows(table){
+  let all=[], from=0; const size=1000;
+  while(true){
+    const {data, error} = await sb.from(table).select('*').range(from, from+size-1);
+    if(error) throw error;
+    all = all.concat(data);
+    if(!data.length || data.length<size) break;
+    from += size;
+  }
+  return all;
+}
+
+async function loadFromSupabase(){
+  document.getElementById('syncStatus').textContent = '⏳ Memuat data dari Supabase…';
+  try{
+    const [salesRows, hppRows] = await Promise.all([fetchAllRows('sales'), fetchAllRows('hpp')]);
+    RECORDS = salesRows.map(r=>({bulan:r.bulan, nama:r.nama, qty:Number(r.qty), harga:Number(r.harga), sub:Number(r.sub), tgl:r.tgl}));
+    HPP_RECORDS = hppRows.map(r=>({nama:r.nama, modal:Number(r.modal), jual:Number(r.jual)||0, kategori:r.kategori||''}));
+    document.getElementById('syncStatus').textContent = `✓ ${RECORDS.length} baris penjualan, ${HPP_RECORDS.length} produk HPP tersinkron dari Supabase.`;
+    renderAll(computeAll(RECORDS, HPP_RECORDS));
+  }catch(err){
+    document.getElementById('syncStatus').textContent = '✕ Gagal memuat dari Supabase: '+err.message;
+  }
+}
+
+async function insertInChunks(table, rows, chunkSize=500){
+  for(let i=0;i<rows.length;i+=chunkSize){
+    const {error} = await sb.from(table).insert(rows.slice(i,i+chunkSize));
+    if(error) throw error;
+  }
+}
+async function upsertInChunks(table, rows, conflictCol, chunkSize=500){
+  for(let i=0;i<rows.length;i+=chunkSize){
+    const {error} = await sb.from(table).upsert(rows.slice(i,i+chunkSize), {onConflict:conflictCol});
+    if(error) throw error;
+  }
+}
+
+/* ---------------- AUTH ---------------- */
+const loginScreen = document.getElementById('loginScreen');
+const dashboardScreen = document.getElementById('dashboardScreen');
+
+async function showDashboard(){
+  loginScreen.style.display='none';
+  dashboardScreen.style.display='block';
+  await loadFromSupabase();
+}
+function showLogin(){
+  loginScreen.style.display='flex';
+  dashboardScreen.style.display='none';
+}
+async function logout(){
+  await sb.auth.signOut();
+  showLogin();
+}
+document.getElementById('logoutBtn').addEventListener('click', logout);
+
+document.getElementById('loginBtn').addEventListener('click', async ()=>{
+  const email = document.getElementById('loginEmail').value.trim();
+  const password = document.getElementById('loginPassword').value;
+  const errEl = document.getElementById('loginErr');
+  errEl.textContent='';
+  if(!email || !password){ errEl.textContent='Isi email dan password.'; return; }
+  const btn = document.getElementById('loginBtn'); btn.disabled=true; btn.textContent='Memproses…';
+  const {error} = await sb.auth.signInWithPassword({email, password});
+  btn.disabled=false; btn.textContent='Masuk';
+  if(error){ errEl.textContent = 'Login gagal: '+error.message; return; }
+  await showDashboard();
+});
+
+/* ---------------- UPLOAD HANDLERS ---------------- */
+const fileInput = document.getElementById('fileInput');
+const uploadBtn = document.getElementById('uploadBtn');
+const statusEl = document.getElementById('uploadStatus');
+const hppInput = document.getElementById('hppInput');
+const uploadHppBtn = document.getElementById('uploadHppBtn');
+const hppStatusEl = document.getElementById('hppStatus');
+const refreshBtn = document.getElementById('refreshBtn');
+
+uploadBtn.addEventListener('click', ()=> fileInput.click());
+uploadHppBtn.addEventListener('click', ()=> hppInput.click());
+refreshBtn.addEventListener('click', loadFromSupabase);
+
+fileInput.addEventListener('change', (e)=>{
+  const file = e.target.files[0]; if(!file) return;
+  statusEl.className=''; statusEl.textContent='⏳ Membaca '+file.name+' ...';
+  const reader = new FileReader();
+  reader.onload = async (ev)=>{
+    try{
+      const workbook = XLSX.read(new Uint8Array(ev.target.result), {type:'array', cellDates:true});
+      const {records, warnings} = parseWorkbook(workbook);
+      if(records.length===0){
+        statusEl.className='err';
+        statusEl.textContent='✕ Gagal membaca data. Pastikan kolom Nama Barang, Qty, Harga, SubTotal, Tanggal Transaksi ada.';
+        return;
+      }
+      statusEl.className=''; statusEl.textContent='⏳ Menyimpan ke Supabase…';
+      const bulanList = [...new Set(records.map(r=>r.bulan))];
+      const {error: delErr} = await sb.from('sales').delete().in('bulan', bulanList);
+      if(delErr) throw delErr;
+      await insertInChunks('sales', records);
+      statusEl.className='ok';
+      statusEl.textContent = `✓ ${records.length} baris (${bulanList.join(', ')}) tersimpan ke Supabase.` + (warnings.length? ' '+warnings.join(' ') : '');
+      await loadFromSupabase();
+    }catch(err){ statusEl.className='err'; statusEl.textContent='✕ Kesalahan: '+err.message; }
+  };
+  reader.readAsArrayBuffer(file);
+  fileInput.value='';
+});
+
+hppInput.addEventListener('change', (e)=>{
+  const file = e.target.files[0]; if(!file) return;
+  hppStatusEl.className=''; hppStatusEl.textContent='⏳ Membaca '+file.name+' ...';
+  const reader = new FileReader();
+  reader.onload = async (ev)=>{
+    try{
+      const workbook = XLSX.read(new Uint8Array(ev.target.result), {type:'array', cellDates:true});
+      const {records, warnings} = parseHppWorkbook(workbook);
+      if(records.length===0){
+        hppStatusEl.className='err';
+        hppStatusEl.textContent='✕ Gagal membaca data modal. Pastikan kolom Nama Barang & Harga Beli ada.';
+        return;
+      }
+      hppStatusEl.className=''; hppStatusEl.textContent='⏳ Menyimpan ke Supabase…';
+      await upsertInChunks('hpp', records, 'nama');
+      hppStatusEl.className='ok';
+      hppStatusEl.textContent = `✓ Data modal ${records.length} produk tersimpan ke Supabase.` + (warnings.length? ' '+warnings.join(' ') : '');
+      await loadFromSupabase();
+    }catch(err){ hppStatusEl.className='err'; hppStatusEl.textContent='✕ Kesalahan: '+err.message; }
+  };
+  reader.readAsArrayBuffer(file);
+  hppInput.value='';
+});
+
+/* ---------------- INIT ---------------- */
+(async function init(){
+  const {data:{session}} = await sb.auth.getSession();
+  if(session){ await showDashboard(); } else { showLogin(); }
+})();
+</script>
+</body>
+</html>
