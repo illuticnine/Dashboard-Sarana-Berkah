@@ -157,6 +157,8 @@
     body *{ visibility:hidden; }
     #calcSection, #calcSection *{ visibility:visible; }
     #calcSection{ position:absolute; left:0; top:0; width:100%; }
+    .tab-panel{ display:block !important; }
+    .tabs{ display:none !important; }
     .calc-actions, .calc-input-row, .calc-del-btn, #calcErr, .calc-meta-row, #planListCard{ display:none !important; }
   }
 
@@ -193,6 +195,17 @@
   table.fm-table td.fm-num{font-family:'IBM Plex Mono',monospace; white-space:nowrap;}
   table.fm-table input.fm-qty-input{width:80px; padding:6px 8px; border:1px solid var(--line); border-radius:6px; font-family:'Inter',sans-serif;}
   .fm-del-btn{background:none; border:none; color:var(--clay); font-size:16px; cursor:pointer; font-weight:700;}
+
+  /* ---- Tab Navigasi ---- */
+  .tabs{display:flex; gap:8px; margin-bottom:24px; border-bottom:2px solid var(--line); padding-bottom:0;}
+  .tab-btn{
+    font-family:'Fraunces',serif; font-size:15px; font-weight:600; padding:10px 18px; border:none; background:none;
+    color:var(--ink-soft); cursor:pointer; border-bottom:3px solid transparent; margin-bottom:-2px; transition:color .15s ease;
+  }
+  .tab-btn:hover{color:var(--ink);}
+  .tab-btn.active{color:var(--clay); border-bottom-color:var(--clay);}
+  .tab-panel{display:none;}
+  .tab-panel.active{display:block;}
 
   .action-box{background:var(--gold-bg); border:1px solid #ecdba8; border-radius:12px; padding:20px 22px;}
   .action-box h4{font-family:'Fraunces',serif; font-size:16px; margin:0 0 12px; color:#7A5A15;}
@@ -269,9 +282,60 @@
     <button class="btn btn-ghost" id="refreshBtn">Muat Ulang Data</button>
   </div>
 
+  <div class="tabs" id="mainTabs">
+    <button class="tab-btn active" data-tab="analisis">📊 Analisis</button>
+    <button class="tab-btn" data-tab="belanja">🛒 Belanja &amp; Restock</button>
+  </div>
+
+  <div class="tab-panel active" id="tabAnalisis">
   <div class="kpi-row" id="kpiRow"></div>
   <div class="kpi-row laba" id="kpiRowLaba"></div>
 
+  <section>
+    <div class="sec-head">
+      <h2 id="trendTitle">Tren Omzet vs Laba Kotor per Bulan</h2>
+      <div class="period-toggle" id="periodToggle">
+        <button data-mode="bulanan" class="active">Bulanan</button>
+        <button data-mode="kuartalan">Kuartalan</button>
+        <button data-mode="semesteran">Semesteran</button>
+      </div>
+    </div>
+    <div class="hint" id="trendHint" style="margin-bottom:10px;"></div>
+    <div class="card"><div class="chart-box"><canvas id="chartTrend"></canvas></div></div>
+  </section>
+
+  <section>
+    <div class="notes">
+      <div class="note pos"><h4>📈 Catatan Positif</h4><ul id="notesPos"></ul></div>
+      <div class="note neg"><h4>📉 Catatan Perlu Perhatian</h4><ul id="notesNeg"></ul></div>
+    </div>
+  </section>
+
+  <section class="grid-2">
+    <div class="card"><h3>Profitabilitas per Kategori Produk</h3><canvas id="chartKategori" height="260"></canvas></div>
+    <div class="card">
+      <h3>⚠️ Produk Terjual di Bawah/Nyaris Modal</h3>
+      <div id="lossList"></div>
+    </div>
+  </section>
+
+  <section class="grid-2">
+    <div class="card"><h3>10 Produk Penyumbang Omzet Terbesar</h3><canvas id="chartTopRev" height="230"></canvas></div>
+    <div class="card"><h3>10 Produk Paling Menguntungkan (Laba Rp)</h3><canvas id="chartTopLaba" height="230"></canvas></div>
+  </section>
+
+  <section class="grid-3">
+    <div class="card"><h3>Rata-rata Omzet per Hari (Senin–Minggu)</h3><canvas id="chartWeekday" height="200"></canvas></div>
+    <div class="card" style="grid-column: span 2;"><h3>Omzet Harian</h3><canvas id="chartDaily" height="200"></canvas></div>
+  </section>
+
+  <section>
+    <div class="action-box"><h4>🎯 Rekomendasi Tindakan</h4><ol id="actionList"></ol></div>
+  </section>
+
+  </div>
+
+  <div class="tab-panel" id="tabBelanja">
   <section>
     <div class="sec-head">
       <h2>⭐ Item Fast-Moving &amp; Dana Restock</h2>
@@ -333,47 +397,7 @@
     </div>
   </section>
 
-  <section>
-    <div class="sec-head">
-      <h2 id="trendTitle">Tren Omzet vs Laba Kotor per Bulan</h2>
-      <div class="period-toggle" id="periodToggle">
-        <button data-mode="bulanan" class="active">Bulanan</button>
-        <button data-mode="kuartalan">Kuartalan</button>
-        <button data-mode="semesteran">Semesteran</button>
-      </div>
-    </div>
-    <div class="hint" id="trendHint" style="margin-bottom:10px;"></div>
-    <div class="card"><div class="chart-box"><canvas id="chartTrend"></canvas></div></div>
-  </section>
-
-  <section>
-    <div class="notes">
-      <div class="note pos"><h4>📈 Catatan Positif</h4><ul id="notesPos"></ul></div>
-      <div class="note neg"><h4>📉 Catatan Perlu Perhatian</h4><ul id="notesNeg"></ul></div>
-    </div>
-  </section>
-
-  <section class="grid-2">
-    <div class="card"><h3>Profitabilitas per Kategori Produk</h3><canvas id="chartKategori" height="260"></canvas></div>
-    <div class="card">
-      <h3>⚠️ Produk Terjual di Bawah/Nyaris Modal</h3>
-      <div id="lossList"></div>
-    </div>
-  </section>
-
-  <section class="grid-2">
-    <div class="card"><h3>10 Produk Penyumbang Omzet Terbesar</h3><canvas id="chartTopRev" height="230"></canvas></div>
-    <div class="card"><h3>10 Produk Paling Menguntungkan (Laba Rp)</h3><canvas id="chartTopLaba" height="230"></canvas></div>
-  </section>
-
-  <section class="grid-3">
-    <div class="card"><h3>Rata-rata Omzet per Hari (Senin–Minggu)</h3><canvas id="chartWeekday" height="200"></canvas></div>
-    <div class="card" style="grid-column: span 2;"><h3>Omzet Harian</h3><canvas id="chartDaily" height="200"></canvas></div>
-  </section>
-
-  <section>
-    <div class="action-box"><h4>🎯 Rekomendasi Tindakan</h4><ol id="actionList"></ol></div>
-  </section>
+  </div>
 
   <footer id="footerNote">Dashboard tersambung ke Supabase. Upload laporan terbaru kapan saja untuk memperbarui data.</footer>
 </div>
@@ -1387,6 +1411,19 @@ document.getElementById('planList').addEventListener('click', (e)=>{
   const id = Number(btn.dataset.id);
   if(btn.dataset.action==='open') openPlan(id);
   else if(btn.dataset.action==='delete') deletePlan(id);
+});
+
+/* ---------------- TAB NAVIGASI ---------------- */
+document.getElementById('mainTabs').addEventListener('click', (e)=>{
+  const btn = e.target.closest('.tab-btn');
+  if(!btn) return;
+  const target = btn.dataset.tab;
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active', b===btn));
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.toggle('active', p.id === 'tab'+target.charAt(0).toUpperCase()+target.slice(1)));
+  if(target==='analisis'){
+    requestAnimationFrame(()=>{ Object.values(charts).forEach(c=>c && c.resize()); });
+  }
+  window.scrollTo({top:0, behavior:'smooth'});
 });
 
 /* ---------------- INIT ---------------- */
