@@ -138,6 +138,47 @@
   .chart-box{position:relative; height:300px;}
   @media (max-width:640px){ .chart-box{height:340px;} }
 
+  /* ---- Kalkulator Rencana Belanja ---- */
+  .calc-input-row{display:flex; gap:10px; flex-wrap:wrap; margin-bottom:8px;}
+  .calc-input-row input[type="text"]{flex:1; min-width:200px; padding:10px 12px; border:1px solid var(--line); border-radius:8px; font-family:'Inter',sans-serif; font-size:14px;}
+  .calc-input-row input[type="number"]{width:90px; padding:10px 12px; border:1px solid var(--line); border-radius:8px; font-family:'Inter',sans-serif; font-size:14px;}
+  .calc-err{color:var(--clay); font-size:12.5px; min-height:16px; margin-bottom:6px;}
+  table.calc-table{width:100%; border-collapse:collapse; font-size:13.5px; min-width:560px;}
+  table.calc-table th{text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--ink-soft); padding:8px 6px; border-bottom:2px solid var(--line);}
+  table.calc-table td{padding:9px 6px; border-bottom:1px dashed var(--line); vertical-align:middle;}
+  table.calc-table td.calc-subtotal{font-family:'IBM Plex Mono',monospace; font-weight:600; white-space:nowrap;}
+  table.calc-table input.calc-qty-input{width:64px; padding:6px 8px; border:1px solid var(--line); border-radius:6px; font-family:'Inter',sans-serif;}
+  .calc-del-btn{background:none; border:none; color:var(--clay); font-size:16px; cursor:pointer; font-weight:700;}
+  .calc-summary{display:flex; justify-content:space-between; align-items:center; margin-top:14px; padding-top:14px; border-top:2px dashed var(--line); font-size:13.5px; color:var(--ink-soft);}
+  .calc-summary .calc-total{font-family:'Fraunces',serif; font-size:20px; color:var(--ink); font-weight:600;}
+  .calc-actions{display:flex; gap:10px; margin-top:16px; flex-wrap:wrap;}
+
+  @media print{
+    body *{ visibility:hidden; }
+    #calcSection, #calcSection *{ visibility:visible; }
+    #calcSection{ position:absolute; left:0; top:0; width:100%; }
+    .calc-actions, .calc-input-row, .calc-del-btn, #calcErr, .calc-meta-row, #planListCard{ display:none !important; }
+  }
+
+  .calc-meta-row{display:flex; gap:10px; flex-wrap:wrap; margin-bottom:14px;}
+  .calc-meta-row input[type="text"]{flex:1; min-width:180px; padding:9px 12px; border:1px solid var(--line); border-radius:8px; font-family:'Inter',sans-serif; font-size:13.5px;}
+  .calc-meta-row select{padding:9px 12px; border:1px solid var(--line); border-radius:8px; font-family:'Inter',sans-serif; font-size:13.5px; background:var(--white);}
+  #calcSaveStatus{font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--ink-soft); align-self:center;}
+
+  .plan-row{display:flex; justify-content:space-between; align-items:center; gap:10px; padding:11px 0; border-bottom:1px dashed var(--line); flex-wrap:wrap;}
+  .plan-row:last-child{border-bottom:none;}
+  .plan-info{flex:1; min-width:180px;}
+  .plan-info .judul{font-weight:700; font-size:13.8px; color:var(--ink);}
+  .plan-info .meta{font-size:12px; color:var(--ink-soft); font-family:'IBM Plex Mono',monospace; margin-top:2px;}
+  .plan-badge{font-size:11px; font-weight:700; padding:3px 9px; border-radius:20px; font-family:'IBM Plex Mono',monospace;}
+  .plan-badge.draft{background:var(--gold-bg); color:#7A5A15;}
+  .plan-badge.selesai{background:var(--sage-bg); color:var(--sage);}
+  .plan-actions{display:flex; gap:8px;}
+  .plan-actions button{font-size:12px; padding:6px 10px; border-radius:6px; border:1px solid var(--line); background:var(--white); color:var(--ink-soft); cursor:pointer; font-family:'Inter',sans-serif; font-weight:600;}
+  .plan-actions button.open-btn{color:var(--clay); border-color:var(--clay);}
+  .plan-summary-row{display:flex; gap:22px; flex-wrap:wrap; margin-bottom:12px; font-size:12.5px; color:var(--ink-soft);}
+  .plan-summary-row b{color:var(--ink); font-family:'IBM Plex Mono',monospace;}
+
   .action-box{background:var(--gold-bg); border:1px solid #ecdba8; border-radius:12px; padding:20px 22px;}
   .action-box h4{font-family:'Fraunces',serif; font-size:16px; margin:0 0 12px; color:#7A5A15;}
   .action-box ol{margin:0; padding-left:20px; font-size:13.8px; line-height:1.75;}
@@ -215,6 +256,52 @@
 
   <div class="kpi-row" id="kpiRow"></div>
   <div class="kpi-row laba" id="kpiRowLaba"></div>
+
+  <section id="calcSection">
+    <div class="sec-head">
+      <h2>🛒 Kalkulator Rencana Belanja</h2>
+      <div class="hint">Total dihitung dari harga modal (HPP) — sebagai patokan berapa dana yang perlu disiapkan untuk belanja stok</div>
+    </div>
+    <div class="card">
+      <div class="calc-meta-row">
+        <input type="text" id="calcJudulInput" placeholder="Judul rencana (mis. Belanja 3 Juli 2026)">
+        <select id="calcStatusSelect">
+          <option value="draft">📝 Rencana (draft)</option>
+          <option value="selesai">✅ Selesai (sudah dibelanjakan)</option>
+        </select>
+      </div>
+      <div class="calc-input-row">
+        <input type="text" id="calcProdukInput" list="calcProdukList" placeholder="Ketik nama produk (mis. Terigu Segitiga 1kg)...">
+        <datalist id="calcProdukList"></datalist>
+        <input type="number" id="calcQtyInput" min="1" value="1">
+        <button class="btn btn-primary" id="calcAddBtn">+ Tambah</button>
+      </div>
+      <div class="calc-err" id="calcErr"></div>
+      <div style="overflow-x:auto;">
+        <table class="calc-table" id="calcTable">
+          <thead><tr><th>Produk</th><th>Harga/pcs</th><th>Rata² Terjual/bln</th><th>Qty Beli</th><th>Subtotal</th><th></th></tr></thead>
+          <tbody id="calcTbody"><tr><td colspan="6" style="color:var(--ink-soft); text-align:center; padding:18px 0;">Belum ada produk ditambahkan.</td></tr></tbody>
+        </table>
+      </div>
+      <div class="calc-summary">
+        <div>Jumlah item: <b id="calcItemCount">0</b></div>
+        <div class="calc-total">Total Belanja: <span id="calcTotal">Rp0</span></div>
+      </div>
+      <div class="calc-actions">
+        <button class="btn btn-ghost" id="calcClearBtn">Bersihkan Daftar</button>
+        <button class="btn btn-ghost" id="calcNewBtn">Rencana Baru</button>
+        <button class="btn btn-primary alt" id="calcSaveBtn">💾 Simpan</button>
+        <button class="btn btn-primary" id="calcPrintBtn">🖨️ Cetak / Simpan PDF</button>
+        <span id="calcSaveStatus"></span>
+      </div>
+    </div>
+
+    <div class="card" id="planListCard" style="margin-top:16px;">
+      <h3>Riwayat Rencana &amp; Pembelanjaan</h3>
+      <div class="plan-summary-row" id="planSummary"></div>
+      <div id="planList"><div style="color:var(--ink-soft); font-size:13px;">Memuat…</div></div>
+    </div>
+  </section>
 
   <section>
     <div class="sec-head">
@@ -817,6 +904,8 @@ async function loadFromSupabase(){
     RECORDS = salesRows.map(r=>({bulan:r.bulan, nama:r.nama, qty:Number(r.qty), harga:Number(r.harga), sub:Number(r.sub), tgl:r.tgl}));
     HPP_RECORDS = hppRows.map(r=>({nama:r.nama, modal:Number(r.modal), jual:Number(r.jual)||0, kategori:r.kategori||''}));
     document.getElementById('syncStatus').textContent = `✓ ${RECORDS.length} baris penjualan, ${HPP_RECORDS.length} produk HPP tersinkron dari Supabase.`;
+    computeAvgMonthlyQty();
+    populateProdukDatalist();
     renderAll(computeAll(RECORDS, HPP_RECORDS));
   }catch(err){
     document.getElementById('syncStatus').textContent = '✕ Gagal memuat dari Supabase: '+err.message;
@@ -843,7 +932,8 @@ const dashboardScreen = document.getElementById('dashboardScreen');
 async function showDashboard(){
   loginScreen.style.display='none';
   dashboardScreen.style.display='block';
-  await loadFromSupabase();
+  newPlan();
+  await Promise.all([loadFromSupabase(), loadPurchasePlans()]);
 }
 function showLogin(){
   loginScreen.style.display='flex';
@@ -930,6 +1020,210 @@ hppInput.addEventListener('change', (e)=>{
   };
   reader.readAsArrayBuffer(file);
   hppInput.value='';
+});
+
+/* ---------------- KALKULATOR RENCANA BELANJA ---------------- */
+let SHOPPING_LIST = [];
+let AVG_MONTHLY_QTY = {};
+
+function computeAvgMonthlyQty(){
+  AVG_MONTHLY_QTY = {};
+  if(!RECORDS.length) return;
+  const totalQtyByProd = {};
+  RECORDS.forEach(r=>{ totalQtyByProd[r.nama] = (totalQtyByProd[r.nama]||0)+r.qty; });
+  const monthsCount = new Set(RECORDS.map(r=>r.bulan)).size || 1;
+  Object.keys(totalQtyByProd).forEach(k=>{ AVG_MONTHLY_QTY[k] = totalQtyByProd[k]/monthsCount; });
+}
+
+function populateProdukDatalist(){
+  const dl = document.getElementById('calcProdukList');
+  if(!dl) return;
+  dl.innerHTML = HPP_RECORDS.map(h=>`<option value="${h.nama.replace(/"/g,'&quot;')}">`).join('');
+}
+
+function renderCalcTable(){
+  const tbody = document.getElementById('calcTbody');
+  if(!SHOPPING_LIST.length){
+    tbody.innerHTML = `<tr><td colspan="6" style="color:var(--ink-soft); text-align:center; padding:18px 0;">Belum ada produk ditambahkan.</td></tr>`;
+  } else {
+    tbody.innerHTML = SHOPPING_LIST.map((item,idx)=>`
+      <tr>
+        <td>${item.nama}</td>
+        <td><input type="number" min="0" value="${item.harga}" data-idx="${idx}" class="calc-harga-input"></td>
+        <td>${item.avgMonthlyQty!=null? Math.round(item.avgMonthlyQty)+' pcs' : '—'}</td>
+        <td><input type="number" min="1" value="${item.qty}" data-idx="${idx}" class="calc-qty-input"></td>
+        <td class="calc-subtotal">${rp(item.harga*item.qty)}</td>
+        <td><button class="calc-del-btn" data-idx="${idx}" title="Hapus">✕</button></td>
+      </tr>`).join('');
+  }
+  updateCalcSummary();
+}
+
+function updateCalcSummary(){
+  document.getElementById('calcItemCount').textContent = SHOPPING_LIST.length;
+  const total = SHOPPING_LIST.reduce((s,i)=>s+i.harga*i.qty,0);
+  document.getElementById('calcTotal').textContent = rp(total);
+}
+
+document.getElementById('calcAddBtn').addEventListener('click', ()=>{
+  const inputEl = document.getElementById('calcProdukInput');
+  const qtyEl = document.getElementById('calcQtyInput');
+  const errEl = document.getElementById('calcErr');
+  const name = inputEl.value.trim();
+  const qty = Math.max(1, parseInt(qtyEl.value)||1);
+  errEl.textContent='';
+  if(!name){ errEl.textContent='Ketik atau pilih nama produk dulu.'; return; }
+  const match = HPP_RECORDS.find(h=>h.nama.toLowerCase()===name.toLowerCase());
+  if(!match){ errEl.textContent='Produk tidak ditemukan di data HPP. Pilih dari daftar saran yang muncul saat mengetik.'; return; }
+  const existing = SHOPPING_LIST.find(x=>x.nama===match.nama);
+  if(existing){ existing.qty += qty; }
+  else { SHOPPING_LIST.push({nama:match.nama, harga:match.modal, avgMonthlyQty: AVG_MONTHLY_QTY[match.nama] ?? null, qty}); }
+  inputEl.value=''; qtyEl.value=1; inputEl.focus();
+  renderCalcTable();
+});
+
+document.getElementById('calcProdukInput').addEventListener('keydown', (e)=>{
+  if(e.key==='Enter'){ e.preventDefault(); document.getElementById('calcAddBtn').click(); }
+});
+
+document.getElementById('calcTbody').addEventListener('input', (e)=>{
+  const idx = +e.target.dataset.idx;
+  if(e.target.classList.contains('calc-qty-input')){ SHOPPING_LIST[idx].qty = Math.max(1, parseInt(e.target.value)||1); }
+  else if(e.target.classList.contains('calc-harga-input')){ SHOPPING_LIST[idx].harga = Math.max(0, parseInt(e.target.value)||0); }
+  else return;
+  const row = e.target.closest('tr');
+  row.querySelector('.calc-subtotal').textContent = rp(SHOPPING_LIST[idx].harga*SHOPPING_LIST[idx].qty);
+  updateCalcSummary();
+});
+
+document.getElementById('calcTbody').addEventListener('click', (e)=>{
+  const btn = e.target.closest('.calc-del-btn');
+  if(!btn) return;
+  SHOPPING_LIST.splice(+btn.dataset.idx, 1);
+  renderCalcTable();
+});
+
+document.getElementById('calcClearBtn').addEventListener('click', ()=>{
+  if(SHOPPING_LIST.length && !confirm('Bersihkan seluruh daftar belanja?')) return;
+  SHOPPING_LIST = [];
+  renderCalcTable();
+});
+
+document.getElementById('calcPrintBtn').addEventListener('click', ()=> window.print());
+
+/* ---------------- SIMPAN / BUKA / RIWAYAT RENCANA BELANJA ---------------- */
+let CURRENT_PLAN_ID = null;
+let PLAN_LIST = [];
+
+function defaultJudul(){
+  return `Belanja ${new Date().toLocaleDateString('id-ID',{day:'2-digit',month:'long',year:'numeric'})}`;
+}
+
+function newPlan(){
+  SHOPPING_LIST = [];
+  CURRENT_PLAN_ID = null;
+  document.getElementById('calcJudulInput').value = defaultJudul();
+  document.getElementById('calcStatusSelect').value = 'draft';
+  document.getElementById('calcSaveStatus').textContent = '';
+  renderCalcTable();
+}
+document.getElementById('calcNewBtn').addEventListener('click', ()=>{
+  if(SHOPPING_LIST.length && !confirm('Buat rencana baru? Perubahan yang belum disimpan akan hilang.')) return;
+  newPlan();
+});
+
+async function savePlan(){
+  const statusEl = document.getElementById('calcSaveStatus');
+  const judul = document.getElementById('calcJudulInput').value.trim() || defaultJudul();
+  const status = document.getElementById('calcStatusSelect').value;
+  if(!SHOPPING_LIST.length){ statusEl.textContent = '✕ Daftar belanja masih kosong.'; return; }
+  const items = SHOPPING_LIST.map(i=>({nama:i.nama, harga:i.harga, qty:i.qty}));
+  const total = items.reduce((s,i)=>s+i.harga*i.qty,0);
+  statusEl.textContent = '⏳ Menyimpan…';
+  try{
+    if(CURRENT_PLAN_ID){
+      const {error} = await sb.from('purchase_plans').update({judul, status, items, total, updated_at:new Date().toISOString()}).eq('id', CURRENT_PLAN_ID);
+      if(error) throw error;
+    } else {
+      const {data, error} = await sb.from('purchase_plans').insert({judul, status, items, total}).select().single();
+      if(error) throw error;
+      CURRENT_PLAN_ID = data.id;
+    }
+    statusEl.textContent = `✓ Tersimpan (${status==='selesai'?'sebagai catatan pengeluaran':'sebagai draft'}).`;
+    await loadPurchasePlans();
+  }catch(err){ statusEl.textContent = '✕ Gagal simpan: '+err.message; }
+}
+document.getElementById('calcSaveBtn').addEventListener('click', savePlan);
+
+async function loadPurchasePlans(){
+  const listEl = document.getElementById('planList');
+  try{
+    const {data, error} = await sb.from('purchase_plans').select('*').order('updated_at', {ascending:false});
+    if(error) throw error;
+    PLAN_LIST = data;
+    renderPlanList();
+  }catch(err){
+    listEl.innerHTML = `<div style="color:var(--clay); font-size:13px;">Gagal memuat riwayat: ${err.message}</div>`;
+  }
+}
+
+function renderPlanList(){
+  const listEl = document.getElementById('planList');
+  const summaryEl = document.getElementById('planSummary');
+  if(!PLAN_LIST.length){
+    listEl.innerHTML = `<div style="color:var(--ink-soft); font-size:13px;">Belum ada rencana tersimpan.</div>`;
+    summaryEl.innerHTML = '';
+    return;
+  }
+  const selesai = PLAN_LIST.filter(p=>p.status==='selesai');
+  const totalSelesai = selesai.reduce((s,p)=>s+Number(p.total),0);
+  summaryEl.innerHTML = `<div>Total pengeluaran tercatat: <b>${rp(totalSelesai)}</b> dari ${selesai.length} transaksi selesai</div>
+    <div>Rencana masih draft: <b>${PLAN_LIST.length-selesai.length}</b></div>`;
+  listEl.innerHTML = PLAN_LIST.map(p=>{
+    const tgl = new Date(p.updated_at||p.created_at).toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric'});
+    const itemCount = Array.isArray(p.items)? p.items.length : 0;
+    return `
+    <div class="plan-row">
+      <div class="plan-info">
+        <div class="judul">${p.judul} <span class="plan-badge ${p.status}">${p.status==='selesai'?'Selesai':'Draft'}</span></div>
+        <div class="meta">${tgl} · ${itemCount} item · ${rp(p.total)}</div>
+      </div>
+      <div class="plan-actions">
+        <button class="open-btn" data-id="${p.id}" data-action="open">Buka</button>
+        <button data-id="${p.id}" data-action="delete">Hapus</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function openPlan(id){
+  const plan = PLAN_LIST.find(p=>p.id===id);
+  if(!plan) return;
+  SHOPPING_LIST = (plan.items||[]).map(i=>({nama:i.nama, harga:i.harga, qty:i.qty, avgMonthlyQty: AVG_MONTHLY_QTY[i.nama] ?? null}));
+  CURRENT_PLAN_ID = plan.id;
+  document.getElementById('calcJudulInput').value = plan.judul;
+  document.getElementById('calcStatusSelect').value = plan.status;
+  document.getElementById('calcSaveStatus').textContent = '';
+  renderCalcTable();
+  document.getElementById('calcSection').scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+async function deletePlan(id){
+  if(!confirm('Hapus rencana ini secara permanen?')) return;
+  try{
+    const {error} = await sb.from('purchase_plans').delete().eq('id', id);
+    if(error) throw error;
+    if(CURRENT_PLAN_ID===id) newPlan();
+    await loadPurchasePlans();
+  }catch(err){ alert('Gagal hapus: '+err.message); }
+}
+
+document.getElementById('planList').addEventListener('click', (e)=>{
+  const btn = e.target.closest('button[data-action]');
+  if(!btn) return;
+  const id = Number(btn.dataset.id);
+  if(btn.dataset.action==='open') openPlan(id);
+  else if(btn.dataset.action==='delete') deletePlan(id);
 });
 
 /* ---------------- INIT ---------------- */
