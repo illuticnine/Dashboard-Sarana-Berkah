@@ -179,6 +179,21 @@
   .plan-summary-row{display:flex; gap:22px; flex-wrap:wrap; margin-bottom:12px; font-size:12.5px; color:var(--ink-soft);}
   .plan-summary-row b{color:var(--ink); font-family:'IBM Plex Mono',monospace;}
 
+  /* ---- Daftar Fast-Moving (kelola manual) ---- */
+  .fm-add-row{display:flex; gap:10px; flex-wrap:wrap; margin-bottom:14px;}
+  .fm-add-row input[type="text"]{flex:1; min-width:220px; padding:10px 12px; border:1px solid var(--line); border-radius:8px; font-family:'Inter',sans-serif; font-size:14px;}
+  .fm-kpi-row{display:grid; grid-template-columns:repeat(2,1fr); gap:12px; margin:14px 0 18px;}
+  .fm-kpi{background:var(--paper); border:1px solid var(--line); border-radius:10px; padding:12px 14px;}
+  .fm-kpi .lbl{font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--ink-soft); font-weight:600;}
+  .fm-kpi .val{font-family:'IBM Plex Mono',monospace; font-size:20px; font-weight:700; margin-top:4px; color:var(--ink);}
+  @media (max-width:640px){ .fm-kpi-row{grid-template-columns:1fr;} }
+  table.fm-table{width:100%; border-collapse:collapse; font-size:13.3px; min-width:520px;}
+  table.fm-table th{text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--ink-soft); padding:8px 6px; border-bottom:2px solid var(--line);}
+  table.fm-table td{padding:8px 6px; border-bottom:1px dashed var(--line); vertical-align:middle;}
+  table.fm-table td.fm-num{font-family:'IBM Plex Mono',monospace; white-space:nowrap;}
+  table.fm-table input.fm-qty-input{width:80px; padding:6px 8px; border:1px solid var(--line); border-radius:6px; font-family:'Inter',sans-serif;}
+  .fm-del-btn{background:none; border:none; color:var(--clay); font-size:16px; cursor:pointer; font-weight:700;}
+
   .action-box{background:var(--gold-bg); border:1px solid #ecdba8; border-radius:12px; padding:20px 22px;}
   .action-box h4{font-family:'Fraunces',serif; font-size:16px; margin:0 0 12px; color:#7A5A15;}
   .action-box ol{margin:0; padding-left:20px; font-size:13.8px; line-height:1.75;}
@@ -256,6 +271,21 @@
 
   <div class="kpi-row" id="kpiRow"></div>
   <div class="kpi-row laba" id="kpiRowLaba"></div>
+
+  <section>
+    <div class="sec-head">
+      <h2>⭐ Item Fast-Moving &amp; Dana Restock</h2>
+    </div>
+    <div class="hint" style="margin-bottom:10px;">Daftar produk yang Anda tentukan sendiri. Harga otomatis sinkron dengan data HPP terbaru — tinggal isi qty untuk hitung dana yang perlu disisihkan.</div>
+    <div class="card">
+      <div class="fm-add-row">
+        <input type="text" id="fmProdukInput" list="calcProdukList" placeholder="Ketik nama produk untuk ditambahkan ke daftar...">
+        <button class="btn btn-primary" id="fmAddBtn">+ Tambah ke Daftar</button>
+      </div>
+      <div class="calc-err" id="fmErr"></div>
+      <div id="fastMovingCard"><div style="color:var(--ink-soft); font-size:13px;">Memuat…</div></div>
+    </div>
+  </section>
 
   <section id="calcSection">
     <div class="sec-head">
@@ -906,6 +936,7 @@ async function loadFromSupabase(){
     document.getElementById('syncStatus').textContent = `✓ ${RECORDS.length} baris penjualan, ${HPP_RECORDS.length} produk HPP tersinkron dari Supabase.`;
     computeAvgMonthlyQty();
     populateProdukDatalist();
+    if(FAST_MOVING_LIST.length) renderFastMovingList();
     renderAll(computeAll(RECORDS, HPP_RECORDS));
   }catch(err){
     document.getElementById('syncStatus').textContent = '✕ Gagal memuat dari Supabase: '+err.message;
@@ -933,7 +964,7 @@ async function showDashboard(){
   loginScreen.style.display='none';
   dashboardScreen.style.display='block';
   newPlan();
-  await Promise.all([loadFromSupabase(), loadPurchasePlans()]);
+  await Promise.all([loadFromSupabase(), loadPurchasePlans(), loadFastMovingList()]);
 }
 function showLogin(){
   loginScreen.style.display='flex';
@@ -1020,6 +1051,138 @@ hppInput.addEventListener('change', (e)=>{
   };
   reader.readAsArrayBuffer(file);
   hppInput.value='';
+});
+
+/* ---------------- ITEM FAST-MOVING (kelola manual, dana sinkron HPP) ---------------- */
+let FAST_MOVING_LIST = [];   // array of nama produk (persist di Supabase)
+let FM_QTY_STATE = {};       // {nama: qty} — sementara, tidak disimpan
+
+async function loadFastMovingList(){
+  try{
+    const {data, error} = await sb.from('fast_moving_items').select('*').order('created_at', {ascending:true});
+    if(error) throw error;
+    FAST_MOVING_LIST = data.map(r=>r.nama);
+  }catch(err){
+    document.getElementById('fastMovingCard').innerHTML = `<div style="color:var(--clay); font-size:13px;">Gagal memuat daftar: ${err.message}</div>`;
+    return;
+  }
+  renderFastMovingList();
+}
+
+function buildHppLookup(){
+  const idx = {};
+  HPP_RECORDS.forEach(h=>{ idx[h.nama]=h; });
+  return idx;
+}
+
+function renderFastMovingList(){
+  const cardEl = document.getElementById('fastMovingCard');
+  const hppIdx = buildHppLookup();
+  if(!FAST_MOVING_LIST.length){
+    cardEl.innerHTML = `<div style="color:var(--ink-soft); font-size:13px;">Belum ada item fast-moving. Tambahkan produk lewat kolom di atas.</div>`;
+    return;
+  }
+  const rowsHtml = FAST_MOVING_LIST.map(nama=>{
+    const h = hppIdx[nama];
+    const harga = h? h.modal : null;
+    const qty = FM_QTY_STATE[nama] || 0;
+    const subtotal = harga!=null? harga*qty : 0;
+    return `<tr data-nama="${nama.replace(/"/g,'&quot;')}">
+      <td>${nama}${harga==null? ' <span style="color:var(--clay); font-size:11px;">(harga HPP tidak ditemukan)</span>':''}</td>
+      <td class="fm-num">${harga!=null? rp(harga) : '—'}</td>
+      <td><input type="number" min="0" value="${qty||''}" placeholder="0" class="fm-qty-input" ${harga==null?'disabled':''}></td>
+      <td class="fm-num fm-subtotal">${rp(subtotal)}</td>
+      <td><button class="fm-del-btn" title="Hapus dari daftar">✕</button></td>
+    </tr>`;
+  }).join('');
+
+  const total = FAST_MOVING_LIST.reduce((s,nama)=>{
+    const h = hppIdx[nama]; if(!h) return s;
+    return s + h.modal*(FM_QTY_STATE[nama]||0);
+  },0);
+  const itemsWithQty = FAST_MOVING_LIST.filter(n=>FM_QTY_STATE[n]>0).length;
+
+  cardEl.innerHTML = `
+    <div class="fm-kpi-row">
+      <div class="fm-kpi"><div class="lbl">Jumlah Item Fast-Moving</div><div class="val">${FAST_MOVING_LIST.length} produk</div></div>
+      <div class="fm-kpi"><div class="lbl">Total Dana Perlu Disisihkan</div><div class="val" id="fmTotalVal">${rp(total)}</div></div>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="fm-table">
+        <thead><tr><th>Produk</th><th>Harga Modal (HPP)</th><th>Qty</th><th>Subtotal</th><th></th></tr></thead>
+        <tbody id="fmTbody">${rowsHtml}</tbody>
+      </table>
+    </div>
+    <div class="calc-actions">
+      <button class="btn btn-primary alt" id="loadFastMovingBtn" ${itemsWithQty===0?'disabled':''}>📥 Muat ke Kalkulator Belanja</button>
+    </div>`;
+
+  document.getElementById('fmTbody').addEventListener('input', (e)=>{
+    if(!e.target.classList.contains('fm-qty-input')) return;
+    const nama = e.target.closest('tr').dataset.nama;
+    const val = Math.max(0, parseInt(e.target.value)||0);
+    FM_QTY_STATE[nama] = val;
+    const h = hppIdx[nama];
+    e.target.closest('tr').querySelector('.fm-subtotal').textContent = rp((h?h.modal:0)*val);
+    const newTotal = FAST_MOVING_LIST.reduce((s,n)=>{ const hh=hppIdx[n]; return hh? s+hh.modal*(FM_QTY_STATE[n]||0) : s; },0);
+    document.getElementById('fmTotalVal').textContent = rp(newTotal);
+    const btn = document.getElementById('loadFastMovingBtn');
+    if(btn) btn.disabled = FAST_MOVING_LIST.every(n=>!(FM_QTY_STATE[n]>0));
+  });
+
+  document.getElementById('fmTbody').addEventListener('click', (e)=>{
+    const btn = e.target.closest('.fm-del-btn');
+    if(!btn) return;
+    const nama = btn.closest('tr').dataset.nama;
+    removeFastMovingItem(nama);
+  });
+
+  document.getElementById('loadFastMovingBtn')?.addEventListener('click', ()=>{
+    const chosen = FAST_MOVING_LIST.filter(n=>FM_QTY_STATE[n]>0 && hppIdx[n]);
+    if(!chosen.length) return;
+    SHOPPING_LIST = chosen.map(n=>({nama:n, harga:hppIdx[n].modal, qty:FM_QTY_STATE[n], avgMonthlyQty: AVG_MONTHLY_QTY[n] ?? null}));
+    CURRENT_PLAN_ID = null;
+    document.getElementById('calcJudulInput').value = `Restock Fast-Moving ${new Date().toLocaleDateString('id-ID',{day:'2-digit',month:'long',year:'numeric'})}`;
+    document.getElementById('calcStatusSelect').value = 'draft';
+    document.getElementById('calcSaveStatus').textContent = '';
+    renderCalcTable();
+    document.getElementById('calcSection').scrollIntoView({behavior:'smooth', block:'start'});
+  });
+}
+
+async function addFastMovingItem(nama){
+  if(FAST_MOVING_LIST.includes(nama)) return;
+  try{
+    const {error} = await sb.from('fast_moving_items').insert({nama});
+    if(error) throw error;
+    FAST_MOVING_LIST.push(nama);
+    renderFastMovingList();
+  }catch(err){ document.getElementById('fmErr').textContent = 'Gagal menambah: '+err.message; }
+}
+
+async function removeFastMovingItem(nama){
+  try{
+    const {error} = await sb.from('fast_moving_items').delete().eq('nama', nama);
+    if(error) throw error;
+    FAST_MOVING_LIST = FAST_MOVING_LIST.filter(n=>n!==nama);
+    delete FM_QTY_STATE[nama];
+    renderFastMovingList();
+  }catch(err){ document.getElementById('fmErr').textContent = 'Gagal menghapus: '+err.message; }
+}
+
+document.getElementById('fmAddBtn').addEventListener('click', ()=>{
+  const inputEl = document.getElementById('fmProdukInput');
+  const errEl = document.getElementById('fmErr');
+  errEl.textContent='';
+  const name = inputEl.value.trim();
+  if(!name){ errEl.textContent='Ketik nama produk dulu.'; return; }
+  const match = HPP_RECORDS.find(h=>h.nama.toLowerCase()===name.toLowerCase());
+  if(!match){ errEl.textContent='Produk tidak ditemukan di data HPP. Pilih dari daftar saran yang muncul saat mengetik.'; return; }
+  addFastMovingItem(match.nama);
+  inputEl.value='';
+});
+document.getElementById('fmProdukInput').addEventListener('keydown', (e)=>{
+  if(e.key==='Enter'){ e.preventDefault(); document.getElementById('fmAddBtn').click(); }
 });
 
 /* ---------------- KALKULATOR RENCANA BELANJA ---------------- */
