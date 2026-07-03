@@ -207,6 +207,22 @@
   .tab-panel{display:none;}
   .tab-panel.active{display:block;}
 
+  /* ---- Update Harga Modal Cepat ---- */
+  .hppq-row{display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-bottom:6px;}
+  .hppq-field{display:flex; flex-direction:column; gap:4px;}
+  .hppq-field label{font-size:11.5px; font-weight:600; color:var(--ink-soft);}
+  .hppq-field input[type="text"]{min-width:220px; padding:9px 12px; border:1px solid var(--line); border-radius:8px; font-family:'Inter',sans-serif; font-size:13.5px;}
+  .hppq-field input[type="number"]{width:130px; padding:9px 12px; border:1px solid var(--line); border-radius:8px; font-family:'Inter',sans-serif; font-size:13.5px;}
+  .hppq-current{font-size:12.5px; color:var(--ink-soft); font-family:'IBM Plex Mono',monospace; margin:6px 0 14px;}
+  .hppq-current b{color:var(--ink); font-family:'Inter',sans-serif;}
+  .hppq-history{margin-top:16px; padding-top:14px; border-top:1px dashed var(--line);}
+  .hppq-history h4{font-size:12px; text-transform:uppercase; letter-spacing:.05em; color:var(--ink-soft); margin:0 0 8px; font-weight:700;}
+  .hppq-history-row{display:flex; justify-content:space-between; font-size:12.5px; padding:6px 0; border-bottom:1px dashed var(--line); color:var(--ink-soft);}
+  .hppq-history-row:last-child{border-bottom:none;}
+  .hppq-history-row .chg{font-family:'IBM Plex Mono',monospace; color:var(--ink);}
+  .hppq-history-row .chg .up{color:var(--clay); font-weight:700;}
+  .hppq-history-row .chg .down{color:var(--sage); font-weight:700;}
+
   .action-box{background:var(--gold-bg); border:1px solid #ecdba8; border-radius:12px; padding:20px 22px;}
   .action-box h4{font-family:'Fraunces',serif; font-size:16px; margin:0 0 12px; color:#7A5A15;}
   .action-box ol{margin:0; padding-left:20px; font-size:13.8px; line-height:1.75;}
@@ -281,6 +297,34 @@
     <div id="syncStatus">Memuat data dari Supabase…</div>
     <button class="btn btn-ghost" id="refreshBtn">Muat Ulang Data</button>
   </div>
+
+  <section>
+    <div class="sec-head"><h2>🔄 Update Harga Modal Cepat</h2></div>
+    <div class="hint" style="margin-bottom:10px;">Untuk update 1-2 harga dari supplier tanpa perlu upload ulang seluruh file Excel.</div>
+    <div class="card">
+      <div class="hppq-row">
+        <div class="hppq-field">
+          <label>Cari Produk</label>
+          <input type="text" id="hppqProdukInput" list="calcProdukList" placeholder="Ketik nama produk...">
+        </div>
+        <div class="hppq-field">
+          <label>Harga Beli Baru (Modal)</label>
+          <input type="number" id="hppqModalInput" min="0" placeholder="0">
+        </div>
+        <div class="hppq-field">
+          <label>Harga Jual Baru (opsional)</label>
+          <input type="number" id="hppqJualInput" min="0" placeholder="kosongkan jika tidak berubah">
+        </div>
+        <button class="btn btn-primary" id="hppqSaveBtn">💾 Simpan</button>
+      </div>
+      <div class="hppq-current" id="hppqCurrent"></div>
+      <div class="calc-err" id="hppqErr"></div>
+      <div class="hppq-history" id="hppqHistory" style="display:none;">
+        <h4>Riwayat Perubahan Harga Produk Ini</h4>
+        <div id="hppqHistoryList"></div>
+      </div>
+    </div>
+  </section>
 
   <div class="tabs" id="mainTabs">
     <button class="tab-btn active" data-tab="analisis">📊 Analisis</button>
@@ -1411,6 +1455,62 @@ document.getElementById('planList').addEventListener('click', (e)=>{
   const id = Number(btn.dataset.id);
   if(btn.dataset.action==='open') openPlan(id);
   else if(btn.dataset.action==='delete') deletePlan(id);
+});
+
+/* ---------------- UPDATE HARGA MODAL CEPAT ---------------- */
+document.getElementById('hppqProdukInput').addEventListener('input', ()=>{
+  const name = document.getElementById('hppqProdukInput').value.trim();
+  const match = HPP_RECORDS.find(h=>h.nama.toLowerCase()===name.toLowerCase());
+  const curEl = document.getElementById('hppqCurrent');
+  const histEl = document.getElementById('hppqHistory');
+  if(!match){ curEl.textContent=''; histEl.style.display='none'; return; }
+  curEl.innerHTML = `Harga saat ini — Modal: <b>${rp(match.modal)}</b> · Jual: <b>${rp(match.jual||0)}</b> · Kategori: <b>${match.kategori||'-'}</b>`;
+  loadHppHistory(match.nama);
+});
+
+async function loadHppHistory(nama){
+  const histEl = document.getElementById('hppqHistory');
+  const listEl = document.getElementById('hppqHistoryList');
+  try{
+    const {data, error} = await sb.from('hpp_price_history').select('*').eq('nama', nama).order('changed_at', {ascending:false}).limit(5);
+    if(error) throw error;
+    if(!data.length){ histEl.style.display='none'; return; }
+    histEl.style.display='block';
+    listEl.innerHTML = data.map(h=>{
+      const tgl = new Date(h.changed_at).toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric'});
+      const naik = h.modal_baru > (h.modal_lama||0);
+      return `<div class="hppq-history-row"><span>${tgl}</span><span class="chg">${rp(h.modal_lama||0)} → <span class="${naik?'up':'down'}">${rp(h.modal_baru)}</span></span></div>`;
+    }).join('');
+  }catch(err){ histEl.style.display='none'; }
+}
+
+document.getElementById('hppqSaveBtn').addEventListener('click', async ()=>{
+  const nameInput = document.getElementById('hppqProdukInput');
+  const modalInput = document.getElementById('hppqModalInput');
+  const jualInput = document.getElementById('hppqJualInput');
+  const errEl = document.getElementById('hppqErr');
+  errEl.style.color=''; errEl.textContent='';
+  const name = nameInput.value.trim();
+  const match = HPP_RECORDS.find(h=>h.nama.toLowerCase()===name.toLowerCase());
+  if(!match){ errEl.textContent='Produk tidak ditemukan. Pilih dari daftar saran yang muncul saat mengetik.'; return; }
+  const newModal = parseInt(modalInput.value);
+  if(!newModal && newModal!==0){ errEl.textContent='Isi harga beli (modal) baru.'; return; }
+  const newJual = jualInput.value.trim()==='' ? match.jual : (parseInt(jualInput.value)||0);
+  const oldModal = match.modal, oldJual = match.jual;
+  try{
+    const {error: upErr} = await sb.from('hpp').update({modal:newModal, jual:newJual, updated_at:new Date().toISOString()}).eq('nama', match.nama);
+    if(upErr) throw upErr;
+    const {error: histErr} = await sb.from('hpp_price_history').insert({nama:match.nama, modal_lama:oldModal, modal_baru:newModal, jual_lama:oldJual, jual_baru:newJual});
+    if(histErr) throw histErr;
+    match.modal = newModal; match.jual = newJual;
+    errEl.style.color='var(--sage)';
+    errEl.textContent = `✓ Harga ${match.nama} diperbarui: ${rp(oldModal)} → ${rp(newModal)}`;
+    modalInput.value=''; jualInput.value='';
+    document.getElementById('hppqCurrent').innerHTML = `Harga saat ini — Modal: <b>${rp(match.modal)}</b> · Jual: <b>${rp(match.jual||0)}</b> · Kategori: <b>${match.kategori||'-'}</b>`;
+    loadHppHistory(match.nama);
+    renderAll(computeAll(RECORDS, HPP_RECORDS));
+    if(FAST_MOVING_LIST.length) renderFastMovingList();
+  }catch(err){ errEl.style.color='var(--clay)'; errEl.textContent = 'Gagal simpan: '+err.message; }
 });
 
 /* ---------------- TAB NAVIGASI ---------------- */
