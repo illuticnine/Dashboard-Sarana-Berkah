@@ -113,6 +113,31 @@
   .loss-list .rp{font-family:'IBM Plex Mono',monospace; color:var(--clay); font-weight:600; white-space:nowrap;}
   .loss-list .qt{font-size:11.5px; color:var(--ink-soft); display:block;}
 
+  /* ---- Detail produk rugi ---- */
+  .loss-detail{border-bottom:1px dashed var(--line); padding:12px 0;}
+  .loss-detail:last-child{border-bottom:none;}
+  .loss-detail-head{display:flex; justify-content:space-between; gap:10px; align-items:baseline;}
+  .loss-detail-head .nm{font-weight:700; font-size:14px; color:var(--ink);}
+  .loss-detail-head .rp{font-family:'IBM Plex Mono',monospace; color:var(--clay); font-weight:700; white-space:nowrap;}
+  .loss-detail-metrics{display:flex; flex-wrap:wrap; gap:4px 14px; font-size:12px; color:var(--ink-soft); margin-top:4px; font-family:'IBM Plex Mono',monospace;}
+  .loss-detail-metrics b{color:var(--ink); font-family:'Inter',sans-serif;}
+  .loss-detail-diag{font-size:12.5px; color:#8C3D26; margin-top:6px; background:#fbeee7; border-radius:6px; padding:6px 9px;}
+  .loss-toggle-btn{width:100%; margin-top:12px; padding:9px; background:transparent; border:1px dashed var(--clay); color:var(--clay);
+    border-radius:8px; font-weight:700; font-size:12.5px; cursor:pointer; font-family:'Inter',sans-serif;}
+  .loss-hidden-group{display:none;}
+  .loss-hidden-group.show{display:block;}
+
+  /* ---- Toggle periode chart ---- */
+  .period-toggle{display:flex; gap:6px;}
+  .period-toggle button{
+    font-family:'IBM Plex Mono',monospace; font-size:12px; font-weight:600; padding:6px 12px; border-radius:20px;
+    border:1px solid var(--line); background:var(--white); color:var(--ink-soft); cursor:pointer;
+  }
+  .period-toggle button.active{background:var(--clay); color:#fff; border-color:var(--clay);}
+
+  .chart-box{position:relative; height:300px;}
+  @media (max-width:640px){ .chart-box{height:340px;} }
+
   .action-box{background:var(--gold-bg); border:1px solid #ecdba8; border-radius:12px; padding:20px 22px;}
   .action-box h4{font-family:'Fraunces',serif; font-size:16px; margin:0 0 12px; color:#7A5A15;}
   .action-box ol{margin:0; padding-left:20px; font-size:13.8px; line-height:1.75;}
@@ -192,8 +217,16 @@
   <div class="kpi-row laba" id="kpiRowLaba"></div>
 
   <section>
-    <div class="sec-head"><h2>Tren Omzet vs Laba Kotor per Bulan</h2><div class="hint" id="trendHint"></div></div>
-    <div class="card"><canvas id="chartTrend" height="90"></canvas></div>
+    <div class="sec-head">
+      <h2 id="trendTitle">Tren Omzet vs Laba Kotor per Bulan</h2>
+      <div class="period-toggle" id="periodToggle">
+        <button data-mode="bulanan" class="active">Bulanan</button>
+        <button data-mode="kuartalan">Kuartalan</button>
+        <button data-mode="semesteran">Semesteran</button>
+      </div>
+    </div>
+    <div class="hint" id="trendHint" style="margin-bottom:10px;"></div>
+    <div class="card"><div class="chart-box"><canvas id="chartTrend"></canvas></div></div>
   </section>
 
   <section>
@@ -207,7 +240,7 @@
     <div class="card"><h3>Profitabilitas per Kategori Produk</h3><canvas id="chartKategori" height="260"></canvas></div>
     <div class="card">
       <h3>⚠️ Produk Terjual di Bawah/Nyaris Modal</h3>
-      <ul class="loss-list" id="lossList"></ul>
+      <div id="lossList"></div>
     </div>
   </section>
 
@@ -341,13 +374,15 @@ function computeAll(records, hppRecords){
     const h = hppIdx[r.nama];
     if(!h) return;
     const modal = r.qty*h.modal, laba = r.sub-modal;
-    if(!prodAgg[r.nama]) prodAgg[r.nama]={nama:r.nama, omzet:0, laba:0, qty:0};
+    if(!prodAgg[r.nama]) prodAgg[r.nama]={nama:r.nama, omzet:0, laba:0, qty:0, modalPerUnit:h.modal, jualKatalog:h.jual||0};
     prodAgg[r.nama].omzet+=r.sub; prodAgg[r.nama].laba+=laba; prodAgg[r.nama].qty+=r.qty;
     const kat = h.kategori || 'Lainnya';
     if(!catAgg[kat]) catAgg[kat]={kategori:kat, omzet:0, laba:0};
     catAgg[kat].omzet+=r.sub; catAgg[kat].laba+=laba;
   });
-  const prodList = Object.values(prodAgg).map(p=>({...p, marginPct: p.omzet? Math.round(p.laba/p.omzet*1000)/10 : null}));
+  const prodList = Object.values(prodAgg).map(p=>({...p,
+    marginPct: p.omzet? Math.round(p.laba/p.omzet*1000)/10 : null,
+    avgJualAktual: p.qty? Math.round(p.omzet/p.qty) : 0}));
   const topLaba = [...prodList].sort((a,b)=>b.laba-a.laba).slice(0,10);
   const lossProducts = prodList.filter(p=>p.laba<0).sort((a,b)=>a.laba-b.laba);
   const totalLossAmount = lossProducts.reduce((s,p)=>s+p.laba,0);
@@ -472,11 +507,125 @@ function generateActions(D){
   return actions.filter(Boolean);
 }
 
+/* ---------------- DIAGNOSA PRODUK RUGI ---------------- */
+function diagnoseLoss(p){
+  if(p.jualKatalog && p.jualKatalog < p.modalPerUnit){
+    return `Harga jual di katalog (${rp(p.jualKatalog)}) sudah lebih rendah dari harga modal (${rp(p.modalPerUnit)}) — perlu dinaikkan di data produk/HPP.`;
+  }
+  if(p.jualKatalog && p.avgJualAktual < p.jualKatalog*0.97){
+    return `Harga katalog sebenarnya ${rp(p.jualKatalog)} (di atas modal), tapi rata-rata harga transaksi tercatat ${rp(p.avgJualAktual)} — kemungkinan ada diskon/salah input harga saat checkout.`;
+  }
+  return `Rata-rata harga jual ${rp(p.avgJualAktual)} vs harga modal ${rp(p.modalPerUnit)} per unit — cek ulang harga jual produk ini.`;
+}
+
+/* ---------------- AGREGASI PERIODE (Bulanan/Kuartalan/Semesteran) ---------------- */
+function aggregatePeriods(monthly, groupSize){
+  if(groupSize<=1) return monthly;
+  const groups = [];
+  for(let i=0;i<monthly.length;i+=groupSize){
+    const chunk = monthly.slice(i, i+groupSize);
+    const label = chunk.length>1 ? `${chunk[0].bulan} – ${chunk[chunk.length-1].bulan}` : chunk[0].bulan;
+    const revenue = chunk.reduce((s,m)=>s+m.revenue,0);
+    const omzetMatched = chunk.reduce((s,m)=>s+m.omzetMatched,0);
+    const modalMatched = chunk.reduce((s,m)=>s+m.modalMatched,0);
+    const labaMatched = omzetMatched-modalMatched;
+    const marginPct = omzetMatched? Math.round(labaMatched/omzetMatched*1000)/10 : null;
+    groups.push({bulan:label, revenue, omzetMatched, modalMatched, labaMatched, marginPct});
+  }
+  return groups;
+}
+
 /* ---------------- RENDER ---------------- */
 function destroyCharts(){ Object.values(charts).forEach(c=>c && c.destroy()); charts={}; }
+let CURRENT_D = null;
+let PERIOD_MODE = 'bulanan';
+const PERIOD_GROUP = {bulanan:1, kuartalan:3, semesteran:6};
+const PERIOD_LABEL = {bulanan:'Bulan', kuartalan:'Kuartal', semesteran:'Semester'};
+
+function renderTrendChart(D, mode){
+  if(charts.trend){ charts.trend.destroy(); }
+  const grouped = aggregatePeriods(D.monthly, PERIOD_GROUP[mode]);
+  document.getElementById('trendTitle').textContent = `Tren Omzet vs Laba Kotor per ${PERIOD_LABEL[mode]}`;
+  document.getElementById('trendHint').textContent = D.hppAvailable ? 'Laba dihitung dari produk yang sudah punya data modal (HPP)' : 'Upload data HPP untuk melihat garis Laba';
+
+  const trendDatasets = [
+    { label:'Omzet', data:grouped.map(m=>m.revenue), borderColor:'#BE5A3A', backgroundColor:'rgba(190,90,58,0.10)',
+      fill:true, tension:0.35, borderWidth:3, pointBackgroundColor:'#BE5A3A', pointRadius:5, pointHoverRadius:7, yAxisID:'y' }
+  ];
+  if(D.hppAvailable){
+    trendDatasets.push({ label:'Laba Kotor', data:grouped.map(m=>m.labaMatched), borderColor:'#6E7D53', backgroundColor:'rgba(110,125,83,0.12)',
+      fill:true, tension:0.35, borderWidth:3, pointBackgroundColor:'#6E7D53', pointRadius:5, pointHoverRadius:7, yAxisID: D.hppAvailable? 'y1':'y' });
+  }
+  const scales = { y:{ position:'left', ticks:{callback:v=>rpShort(v)}, grid:{color:'#EFE7D8'}, title:{display:true, text:'Omzet', font:{size:11}} },
+                    x:{ grid:{display:false}, ticks:{maxRotation:45, minRotation:0} } };
+  if(D.hppAvailable){
+    scales.y1 = { position:'right', ticks:{callback:v=>rpShort(v)}, grid:{display:false}, title:{display:true, text:'Laba Kotor', font:{size:11}} };
+  }
+  charts.trend = new Chart(document.getElementById('chartTrend'), {
+    type:'line', data:{ labels: grouped.map(m=>m.bulan), datasets: trendDatasets },
+    options:{ responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{display:D.hppAvailable}, tooltip:{callbacks:{label:c=>{
+        const m = grouped[c.dataIndex];
+        if(c.dataset.label==='Laba Kotor') return `Laba: ${rp(c.raw)} (margin ${m.marginPct}%)`;
+        return 'Omzet: '+rp(c.raw);
+      }}}}, scales }
+  });
+}
+
+document.getElementById('periodToggle').addEventListener('click', (e)=>{
+  const btn = e.target.closest('button[data-mode]');
+  if(!btn || !CURRENT_D) return;
+  PERIOD_MODE = btn.dataset.mode;
+  [...document.getElementById('periodToggle').children].forEach(b=>b.classList.toggle('active', b===btn));
+  renderTrendChart(CURRENT_D, PERIOD_MODE);
+});
+
+function lossCardHTML(p){
+  return `
+    <div class="loss-detail">
+      <div class="loss-detail-head">
+        <span class="nm">${p.nama}</span>
+        <span class="rp">${rp(p.laba)}</span>
+      </div>
+      <div class="loss-detail-metrics">
+        <span><b>${p.qty}</b> pcs terjual</span>
+        <span>Omzet <b>${rp(p.omzet)}</b></span>
+        <span>Jual rata² <b>${rp(p.avgJualAktual)}</b></span>
+        <span>Modal <b>${rp(p.modalPerUnit)}</b>/pcs</span>
+        <span>Margin <b>${p.marginPct}%</b></span>
+      </div>
+      <div class="loss-detail-diag">${diagnoseLoss(p)}</div>
+    </div>`;
+}
+
+function renderLossDetail(D){
+  const lossListEl = document.getElementById('lossList');
+  if(!D.hppAvailable){
+    lossListEl.innerHTML = `<div style="color:var(--ink-soft); font-size:13.5px;">Upload data HPP untuk melihat daftar ini.</div>`;
+    return;
+  }
+  if(!D.lossProducts.length){
+    lossListEl.innerHTML = `<div style="color:var(--sage); font-weight:600; font-size:13.5px;">Tidak ada produk yang dijual di bawah harga modal. Bagus!</div>`;
+    return;
+  }
+  const visible = D.lossProducts.slice(0,8);
+  const rest = D.lossProducts.slice(8);
+  let html = visible.map(lossCardHTML).join('');
+  if(rest.length){
+    html += `<div class="loss-hidden-group" id="lossHiddenGroup">${rest.map(lossCardHTML).join('')}</div>
+      <button class="loss-toggle-btn" id="lossToggleBtn">Tampilkan semua ${D.lossProducts.length} produk rugi</button>`;
+  }
+  lossListEl.innerHTML = html;
+  document.getElementById('lossToggleBtn')?.addEventListener('click', (e)=>{
+    const grp = document.getElementById('lossHiddenGroup');
+    const showing = grp.classList.toggle('show');
+    e.target.textContent = showing ? 'Sembunyikan' : `Tampilkan semua ${D.lossProducts.length} produk rugi`;
+  });
+}
 
 function renderAll(D){
   destroyCharts();
+  CURRENT_D = D;
   if(D.monthly.length===0){
     document.getElementById('periodBox').innerHTML = `PERIODE<br><b>Belum ada data</b><br>Silakan upload laporan penjualan`;
     ['kpiRow','kpiRowLaba','notesPos','notesNeg','actionList','lossList'].forEach(id=>document.getElementById(id).innerHTML='');
@@ -518,24 +667,7 @@ function renderAll(D){
     kpiLabaEl.style.display='none';
   }
 
-  document.getElementById('trendHint').textContent = D.hppAvailable ? 'Laba dihitung dari produk yang sudah punya data modal (HPP)' : 'Upload data HPP untuk melihat garis Laba';
-
-  const trendDatasets = [
-    { label:'Omzet', data:D.monthly.map(m=>m.revenue), borderColor:'#BE5A3A', backgroundColor:'rgba(190,90,58,0.10)',
-      fill:true, tension:0.35, borderWidth:3, pointBackgroundColor:'#BE5A3A', pointRadius:5, pointHoverRadius:7 }
-  ];
-  if(D.hppAvailable){
-    trendDatasets.push({ label:'Laba Kotor', data:D.monthly.map(m=>m.labaMatched), borderColor:'#6E7D53', backgroundColor:'rgba(110,125,83,0.12)',
-      fill:true, tension:0.35, borderWidth:3, pointBackgroundColor:'#6E7D53', pointRadius:5, pointHoverRadius:7 });
-  }
-  charts.trend = new Chart(document.getElementById('chartTrend'), {
-    type:'line', data:{ labels: D.monthly.map(m=>m.bulan), datasets: trendDatasets },
-    options:{ plugins:{legend:{display:D.hppAvailable}, tooltip:{callbacks:{label:c=>{
-        const m = D.monthly[c.dataIndex];
-        if(c.dataset.label==='Laba Kotor') return `Laba: ${rp(c.raw)} (margin ${m.marginPct}%)`;
-        return 'Omzet: '+rp(c.raw);
-      }}}}, scales:{ y:{ticks:{callback:v=>rpShort(v)}, grid:{color:'#EFE7D8'}}, x:{grid:{display:false}} } }
-  });
+  renderTrendChart(D, PERIOD_MODE);
 
   const notes = generateNotes(D);
   document.getElementById('notesPos').innerHTML = notes.pos.map(n=>`<li>${n}</li>`).join('');
@@ -551,16 +683,7 @@ function renderAll(D){
     });
   }
 
-  const lossListEl = document.getElementById('lossList');
-  if(D.hppAvailable && D.lossProducts.length){
-    lossListEl.innerHTML = D.lossProducts.slice(0,10).map(p=>`
-      <li><span><span class="nm">${p.nama}</span><span class="qt">${p.qty} pcs terjual · margin ${p.marginPct}%</span></span>
-      <span class="rp">${rp(p.laba)}</span></li>`).join('');
-  } else if(D.hppAvailable){
-    lossListEl.innerHTML = `<li style="color:var(--sage); font-weight:600;">Tidak ada produk yang dijual di bawah harga modal. Bagus!</li>`;
-  } else {
-    lossListEl.innerHTML = `<li style="color:var(--ink-soft);">Upload data HPP untuk melihat daftar ini.</li>`;
-  }
+  renderLossDetail(D);
 
   charts.topRev = new Chart(document.getElementById('chartTopRev'), {
     type:'bar', data:{ labels:D.topRevenue.map(p=>p.nama), datasets:[{ data:D.topRevenue.map(p=>p.value), backgroundColor:'#C4922A', borderRadius:4 }] },
